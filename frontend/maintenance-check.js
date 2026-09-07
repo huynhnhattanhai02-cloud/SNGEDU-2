@@ -7,8 +7,8 @@
 // luôn phải dùng được kể cả khi web đang bảo trì.
 // ============================================================================
 (function () {
-    var MNT_URL = 'https://yqcyevfnajfklmoefywc.supabase.co';
-    var MNT_KEY = 'sb_publishable_w7zcXEgN5055R4_36ZzrWQ_zecv4irf';
+    var MNT_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
+    var MNT_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
 
     // Ẩn tạm nội dung trang trong lúc chờ kiểm tra, tránh nháy nội dung rồi mới
     // chuyển hướng. Có timeout dự phòng để không chặn trang quá lâu nếu mạng lỗi.
