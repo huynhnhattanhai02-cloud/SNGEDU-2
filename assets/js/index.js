@@ -117,8 +117,8 @@ const toast = document.getElementById('toast');
     bindLockedCards();
 
     // ---------------- ĐỒNG BỘ MÔN HỌC VỚI SUPABASE ----------------
-    const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+    const SUPABASE_URL = 'https://yqcyevfnajfklmoefywc.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_w7zcXEgN5055R4_36ZzrWQ_zecv4irf';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ---------------- ĐĂNG NHẬP / ĐĂNG KÝ — chỉ chặn khi bấm vào Trắc nghiệm, Tài liệu, Công cụ, Sản phẩm ----------------
