@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let subjects = [];
@@ -219,6 +219,7 @@ function restoreLastAdminPanel(){
         if (last === 'stats')             return showStatsPanel();
         if (last === 'visits')            return showVisitsPanel();
         if (last === 'stock')             return showStockManager();
+        if (last === 'ctv')               return showCtvPanel();
     }
     showStatsPanel(); // mặc định: lần đăng nhập đầu tiên / chưa từng chọn màn nào -> luôn vào Thống kê trước
 }
@@ -227,7 +228,7 @@ function restoreLastAdminPanel(){
 // subjectManagerPanel: chọn/quản lý Môn học + Chương/đề (rộng rãi, khu vực chính)
 // mainAppArea: soạn/xem câu hỏi của 1 chương/đề đã chọn
 // settingsPanel: cài đặt trang chủ (hero + các thẻ truy cập nhanh)
-const ADMIN_PANEL_IDS = ['statsPanel', 'visitsPanel', 'subjectManagerPanel', 'mainAppArea', 'settingsPanel', 'generalSettingsPanel', 'maintenancePanel', 'comingSoonPanel', 'contentManagerPanel', 'accountsPanel', 'sepayPackagesPanel', 'featuredPanel', 'usageLimitsPanel', 'feedbackPanel', 'notifyPanel', 'paymentSettingsPanel', 'emailSettingsPanel', 'stockManagerPanel'];
+const ADMIN_PANEL_IDS = ['statsPanel', 'visitsPanel', 'subjectManagerPanel', 'mainAppArea', 'settingsPanel', 'generalSettingsPanel', 'maintenancePanel', 'comingSoonPanel', 'contentManagerPanel', 'accountsPanel', 'sepayPackagesPanel', 'featuredPanel', 'usageLimitsPanel', 'feedbackPanel', 'notifyPanel', 'paymentSettingsPanel', 'emailSettingsPanel', 'stockManagerPanel', 'ctvPanel'];
 function showAdminPanel(panelId, navId){
     ADMIN_PANEL_IDS.forEach(id => {
         const el = document.getElementById(id);
@@ -252,6 +253,18 @@ function showComingSoon(key){
 function showSubjectManager(){
     rememberAdminPanel('subjectMgr');
     showAdminPanel('subjectManagerPanel', 'navSubjectMgr');
+}
+
+// ---------- CỘNG TÁC VIÊN (CTV) — nhúng ctv.html bằng iframe, ở lại trong trang admin, không mở tab/trang mới ----------
+function showCtvPanel(){
+    rememberAdminPanel('ctv');
+    showAdminPanel('ctvPanel', 'navCtv');
+    const iframe = document.getElementById('ctvIframe');
+    // Chỉ gán src lần đầu tiên (khi còn rỗng) để mỗi lần quay lại mục này không bị tải lại từ đầu,
+    // mất trạng thái (bộ lọc, trang đang xem...) mà CTV đang thao tác dở.
+    if (iframe && !iframe.getAttribute('src')){
+        iframe.setAttribute('src', 'ctv.html');
+    }
 }
 
 // ---------- THỐNG KÊ (trang đầu tiên khi vào admin) ----------
@@ -2643,8 +2656,7 @@ const CONTENT_DEFAULTS = {
         intro_desc: 'Báo lỗi câu hỏi, góp ý tính năng, hay chỉ đơn giản chưa hiểu một đáp án nào đó trong đề — đội SNG EDU đọc và trả lời trực tiếp, không qua chatbot.',
         contacts: [
             { id:'c1', icon:'fa-solid fa-comment-dots', color:'blue',  title:'Nhắn Zalo',          desc:'Nhấn để mở Zalo chat', status_label:'Phản hồi trong ngày', link:'https://zalo.me/0825160035' },
-            { id:'c2', icon:'fa-solid fa-pen-to-square', color:'green', title:'Gửi form góp ý', desc:'Điền ngay trên web, không cần rời trang',          status_label:'Kèm ảnh, chọn đúng môn & câu',    link:'gop-y.html' },
-            { id:'c3', icon:'fa-solid fa-gift', color:'amber', title:'Nhận Pro miễn phí', desc:'Đổi tài liệu, báo lỗi hoặc giới thiệu bạn bè để nhận Premium', status_label:'Không cần thanh toán', link:'nhan-pro.html' }
+            { id:'c2', icon:'fa-solid fa-pen-to-square', color:'green', title:'Gửi form góp ý', desc:'Điền ngay trên web, không cần rời trang',          status_label:'Kèm ảnh, chọn đúng môn & câu',    link:'gop-y.html' }
         ],
         faq: [
             { id:'f1', title:'Tài liệu và trắc nghiệm trên SNG EDU có mất phí không?', desc:'Toàn bộ học phần đang mở đều miễn phí 100%. Các gói nâng cao (nếu có trong tương lai) sẽ được thông báo rõ trước khi ra mắt, không tự động trừ phí.' },
@@ -2675,15 +2687,44 @@ const R2_PUBLIC_URLS = {
     'feedback-images': 'https://pub-b6c3ac33d32c483d9532578f9ed21303.r2.dev',
     'ctv-documents': 'https://pub-04d67e116ce44411888b66104e6c614e.r2.dev'
 };
+// Supabase JS chỉ trả error.message = "Edge Function returned a non-2xx status code" (chung chung,
+// không nói lý do thật) mỗi khi function trả lỗi — lý do thật nằm trong BODY của response lỗi đó,
+// nằm ở error.context (đối tượng Response). Đọc ra để hiện đúng lý do (VD: sai key R2, file quá lớn
+// theo giới hạn của function, bucket không tồn tại...) thay vì mỗi lần lỗi đều chỉ thấy 1 câu chung.
+async function r2ErrorDetail(error){
+    try{
+        if (error && error.context && typeof error.context.json === 'function'){
+            const body = await error.context.clone().json();
+            if (body && (body.error || body.message)) return body.error || body.message;
+        }
+    }catch(e){}
+    try{
+        if (error && error.context && typeof error.context.text === 'function'){
+            const text = await error.context.clone().text();
+            if (text) return text.slice(0, 300);
+        }
+    }catch(e){}
+    return (error && error.message) || 'Lỗi tải file lên.';
+}
 async function r2Upload(bucket, path, file){
-    const form = new FormData();
-    form.append('bucket', bucket);
-    form.append('path', path);
-    form.append('file', file);
-    const { data, error } = await sb.functions.invoke('r2-storage', { body: form });
-    if (error) throw new Error(error.message || 'Lỗi tải file lên.');
-    if (!data || !data.ok) throw new Error((data && data.error) || 'Lỗi tải file lên.');
-    return data; // { ok:true, publicUrl, path }
+    // Bước 1: xin link ký sẵn (presigned URL) từ Edge Function — function chỉ nhận
+    // JSON, KHÔNG nhận file kèm theo nữa (Supabase Edge Function giới hạn cứng
+    // body ~6MB nên không gửi file thẳng qua function được).
+    const { data, error } = await sb.functions.invoke('r2-storage', {
+        body: { action: 'get-upload-url', bucket, path, contentType: file.type || 'application/octet-stream' }
+    });
+    if (error) throw new Error(await r2ErrorDetail(error));
+    if (!data || !data.ok || !data.uploadUrl) throw new Error((data && data.error) || 'Lỗi tải file lên.');
+
+    // Bước 2: trình duyệt PUT file thẳng lên R2 bằng link đó (không qua Supabase nữa).
+    const putRes = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+    });
+    if (!putRes.ok) throw new Error('Tải file lên R2 thất bại (mã lỗi ' + putRes.status + ').');
+
+    return data; // { ok:true, uploadUrl, publicUrl, path }
 }
 async function r2Delete(bucket, path){
     if (!path) return;
@@ -2778,6 +2819,7 @@ function contentBlockHtml(subKey){
                     <div class="doc-type-toggle" id="cmDocType_${subKey}">
                         <div class="doc-type-opt free" data-type="free" onclick="pickDocType('${subKey}','free')"><i class="fa-solid fa-gift"></i> Miễn phí</div>
                         <div class="doc-type-opt paid" data-type="paid" onclick="pickDocType('${subKey}','paid')"><i class="fa-solid fa-lock"></i> Trả phí</div>
+                        <div class="doc-type-opt vip" data-type="vip" onclick="pickDocType('${subKey}','vip')"><i class="fa-solid fa-crown"></i> Nạp VIP xem</div>
                     </div>
                     <label style="margin-top:10px;">Giá bán (VNĐ)</label>
                     <input id="cmPrice_${subKey}" type="number" min="0" step="1000" placeholder="VD: 20000" oninput="updateContentPreview('${subKey}')">
@@ -2919,11 +2961,53 @@ function contentBlockHtml(subKey){
     </div>`;
 }
 
-async function showContentManager(type){
+// ============================================================================
+// TAB "TÀI LIỆU DOC" — chỉ có ở mục Tài liệu.
+// Tab 1: danh sách tài liệu như cũ (free/paid).
+// Tab 2: nhúng trang admin/doc-preview.html để tách trang cho từng tài liệu trả phí
+//        -> khách đọc online, xem thử N trang đầu, nạp VIP (Pro) mới xem full.
+// ============================================================================
+let docTabCurrent = 'list';
+
+function switchDocTab(tab, focusId){
+    docTabCurrent = (tab === 'pages') ? 'pages' : 'list';
+    document.querySelectorAll('#docTabs .fmgr-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.doctab === docTabCurrent);
+    });
+    const isPages = docTabCurrent === 'pages';
+    document.getElementById('cmListsWrap').classList.toggle('hidden', isPages);
+    document.getElementById('docPagesTabBox').classList.toggle('hidden', !isPages);
+
+    const frame = document.getElementById('docPagesFrame');
+    if (isPages){
+        // Nạp lại iframe mỗi lần mở để luôn thấy dữ liệu mới nhất (và cuộn tới đúng tài liệu nếu có focusId)
+        frame.src = 'doc-preview.html?embed=1' + (focusId ? '&focus=' + encodeURIComponent(focusId) : '') + '&t=' + Date.now();
+    } else {
+        frame.src = 'about:blank';
+    }
+}
+
+// Mở thẳng tab "Tài liệu doc" và nhảy tới đúng tài liệu vừa bấm trong danh sách
+function openDocPagesFor(id){
+    switchDocTab('pages', id);
+    document.getElementById('docTabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function showContentManager(type, docTab){
     const group = CONTENT_MANAGER_GROUPS[type];
     if (!group) return;
     rememberAdminPanel('content:' + type);
-    showAdminPanel('contentManagerPanel', 'nav_' + type);
+    showAdminPanel('contentManagerPanel', type === 'doc' && docTab === 'pages' ? 'nav_doc_preview' : 'nav_' + type);
+
+    const isDoc = !!(contentLists && group.subKeys.some(k => contentLists[k] && contentLists[k].meta.docTypeField));
+    document.getElementById('docTabs').classList.toggle('hidden', !isDoc);
+    if (isDoc){
+        switchDocTab(docTab === 'pages' ? 'pages' : 'list');
+    } else {
+        document.getElementById('cmListsWrap').classList.remove('hidden');
+        document.getElementById('docPagesTabBox').classList.add('hidden');
+        document.getElementById('docPagesFrame').src = 'about:blank';
+    }
     document.getElementById('cmHeaderIcon').textContent = group.icon;
     document.getElementById('cmHeaderTitle').textContent = group.title;
     document.getElementById('cmHeaderHint').textContent = group.hint;
@@ -2953,13 +3037,27 @@ async function loadContentList(subKey){
     let payload = (data && data.payload) ? data.payload : null;
     if (!payload) payload = CONTENT_DEFAULTS[cfg.settingsKey] || {};
     let arr;
+    let hadDupToClean = false;
     if (cfg.meta.docTypeField){
         // Tài liệu: gộp 2 mảng free/paid (định dạng lưu trữ cũ, trang chủ vẫn đọc riêng 2 mảng này)
         // thành 1 danh sách duy nhất trong admin, đánh dấu bằng item.type.
         const freeArr = Array.isArray(payload.free) ? payload.free : [];
         const paidArr = Array.isArray(payload.paid) ? payload.paid : [];
-        arr = freeArr.map(x => Object.assign({}, x, { type: 'free', price: 0 }))
-            .concat(paidArr.map(x => Object.assign({}, x, { type: 'paid' })));
+        // 3 loại: free (tải tự do) · paid (mua lẻ) · vip (access:'pro' — nạp VIP mới xem).
+        // Loại vip vẫn nằm trong mảng paid[] để Edge Function doc-pages coi là tài liệu cần quyền.
+        const merged = freeArr.map(x => Object.assign({}, x, { type: 'free', price: 0 }))
+            .concat(paidArr.map(x => Object.assign({}, x, { type: x.access === 'pro' ? 'vip' : 'paid' })));
+        // Khử trùng: nếu 1 ID lỡ nằm ở CẢ HAI mảng free[]/paid[] (hậu quả của 1 bug đã sửa —
+        // trước đây lưu tài liệu VIP bị ghi thừa 1 bản vào free[]), chỉ giữ đúng 1 bản, ưu tiên
+        // bản paid/vip (đó mới là "sự thật", bản free là bản lỗi bị ghi thừa).
+        const byId = new Map();
+        merged.forEach(it => {
+            const key = String(it.id);
+            const existing = byId.get(key);
+            if (existing && (existing.type === 'free') !== (it.type === 'free')) hadDupToClean = true;
+            if (!existing || existing.type === 'free') byId.set(key, it);
+        });
+        arr = Array.from(byId.values());
     } else {
         arr = Array.isArray(payload[cfg.arrayField]) ? payload[cfg.arrayField] : [];
         arr = arr.map(x => Object.assign({}, x));
@@ -2967,6 +3065,10 @@ async function loadContentList(subKey){
     cfg.items = arr;
     cfg.items.forEach(it => { if (!it.id) it.id = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); });
     renderContentList(subKey);
+    if (hadDupToClean){
+        // Tự dọn database ngay lần tải đầu tiên sau khi vá lỗi, không bắt admin phải bấm Lưu thủ công.
+        saveContentList(subKey).catch(() => {});
+    }
 }
 
 function contentItemRowHtml(subKey, item){
@@ -2991,7 +3093,11 @@ function contentItemRowHtml(subKey, item){
     let typeBadgeHtml = '';
     if (cfg.docTypeField){
         const isPaid = item.type === 'paid';
-        typeBadgeHtml = `<span class="status-badge ${isPaid ? 'maintenance' : 'ready'}" style="margin-right:6px;">${isPaid ? 'Trả phí' : 'Miễn phí'}</span>`;
+        const isVipDoc = item.type === 'vip';
+        typeBadgeHtml = `<span class="status-badge ${isPaid || isVipDoc ? 'maintenance' : 'ready'}" style="margin-right:6px;">${isVipDoc ? '👑 Nạp VIP xem' : isPaid ? 'Trả phí' : 'Miễn phí'}</span>`;
+        if (item.pages_ready && item.preview_mode === 'pages'){
+            typeBadgeHtml += `<span class="status-badge ready" style="margin-right:6px;" title="Khách đọc được ${item.pages_total || 0} trang online, xem thử ${item.free_pages || 0} trang đầu">🧩 Đọc online${item.pages_total ? ' · ' + item.pages_total + ' tr' : ''}</span>`;
+        }
         if (isPaid && item.price) extraLabel += ' · ' + Number(item.price).toLocaleString('vi-VN') + 'đ';
     }
     const thumbSize = cfg.docTypeField ? 38 : 26;
@@ -3015,7 +3121,7 @@ function contentItemRowHtml(subKey, item){
                     <div class="menu-drop hidden" id="cmmenu-${subKey}-${item.id}">
                         <button onclick="event.stopPropagation(); closeAllContentMenus(); editContentItem('${subKey}','${item.id}')">✏️ Sửa</button>
                         <button onclick="event.stopPropagation(); closeAllContentMenus(); deleteContentItem('${subKey}','${item.id}')">🗑️ Xóa</button>
-
+                        ${cfg.docTypeField && (item.type === 'paid' || item.type === 'vip') ? `<button onclick="event.stopPropagation(); closeAllContentMenus(); openDocPagesFor('${String(item.id).replace(/'/g, "\\'")}')">🧩 Tài liệu doc (đọc online)</button>` : ''}
                     </div>
                 </span>
             </span>
@@ -3356,7 +3462,7 @@ function pickDocType(subKey, type){
     const priceEl = document.getElementById('cmPrice_' + subKey);
     const priceHintEl = document.getElementById('cmPriceHint_' + subKey);
     if (priceEl){
-        if (type === 'free'){
+        if (type === 'free' || type === 'vip'){
             priceEl.value = 0;
             priceEl.disabled = true;
         } else {
@@ -3367,6 +3473,8 @@ function pickDocType(subKey, type){
     if (priceHintEl){
         priceHintEl.textContent = type === 'free'
             ? 'Tài liệu miễn phí — giá tự động là 0đ, khách tải trực tiếp.'
+            : type === 'vip'
+            ? 'Không bán lẻ — khách phải đang có gói Pro (VIP) mới xem/tải được. Giá để 0đ.'
             : 'Bắt buộc > 0. Khách phải thanh toán qua SePay mới tải được file này.';
     }
     updateContentPreview(subKey);
@@ -3403,20 +3511,26 @@ function updateContentPreview(subKey){
     // Tài liệu: xem trước dạng thẻ giống hệt thẻ thật ngoài trang chủ (ảnh/icon + badge + giá/CTA).
     if (cfg.meta.docTypeField){
         const typeSel = document.querySelector('#cmDocType_' + subKey + ' .doc-type-opt.selected');
-        const isPaid = typeSel ? typeSel.dataset.type === 'paid' : false;
+        const docType = typeSel ? typeSel.dataset.type : 'free';
+        const isVipType = docType === 'vip';
+        const isPaid = docType === 'paid';
 
         const tagEl = document.getElementById('cmPrevTag_' + subKey);
         if (tagEl){
-            tagEl.className = 'dcp-tag' + (isPaid ? ' paid' : '');
-            tagEl.innerHTML = isPaid ? '<i class="fa-solid fa-lock"></i> Trả phí' : '<i class="fa-solid fa-gift"></i> Miễn phí';
+            tagEl.className = 'dcp-tag' + (isPaid || isVipType ? ' paid' : '');
+            tagEl.innerHTML = isVipType ? '<i class="fa-solid fa-crown"></i> VIP'
+                : isPaid ? '<i class="fa-solid fa-lock"></i> Trả phí'
+                : '<i class="fa-solid fa-gift"></i> Miễn phí';
         }
 
         const ctaEl = document.getElementById('cmPrevCta_' + subKey);
         if (ctaEl){
             const priceEl = document.getElementById('cmPrice_' + subKey);
             const priceVal = priceEl ? Number(priceEl.value || 0) : 0;
-            ctaEl.className = 'dcp-cta' + (isPaid ? ' paid' : '');
-            ctaEl.innerHTML = isPaid
+            ctaEl.className = 'dcp-cta' + (isPaid || isVipType ? ' paid' : '');
+            ctaEl.innerHTML = isVipType
+                ? '<i class="fa-solid fa-crown"></i> Nâng cấp Pro để xem'
+                : isPaid
                 ? '<i class="fa-solid fa-cart-shopping"></i> Mua ngay' + (priceVal > 0 ? ' · ' + priceVal.toLocaleString('vi-VN') + 'đ' : '')
                 : '<i class="fa-solid fa-download"></i> Tải xuống';
         }
@@ -4008,7 +4122,7 @@ function editContentItem(subKey, id){
         pickDocSource(subKey, isUploaded || !item.link ? 'upload' : 'link');
     }
     if (!cfg.meta.hideIconColor) pickContentColor(subKey, item.color || cfg.meta.color || 'indigo');
-    if (cfg.meta.docTypeField) pickDocType(subKey, item.type === 'paid' ? 'paid' : 'free');
+    if (cfg.meta.docTypeField) pickDocType(subKey, ['paid','vip'].includes(item.type) ? item.type : 'free');
     if (cfg.meta.docTypeField && priceEl) priceEl.value = item.price || (item.type === 'paid' ? '' : 0);
     const visibleEl = document.getElementById('cmVisible_' + subKey); if (visibleEl) visibleEl.checked = !item.hidden;
     if (cfg.meta.stockManagedField){
@@ -4084,7 +4198,7 @@ async function saveContentItem(subKey){
     }
     if (cfg.meta.priceField && !usingVariants){
         const priceEl = document.getElementById('cmPrice_' + subKey);
-        if (docType === 'free'){
+        if (docType === 'free' || docType === 'vip'){
             item.price = 0;
         } else {
             const price = priceEl ? Number(priceEl.value) : 0;
@@ -4107,7 +4221,16 @@ async function saveContentItem(subKey){
     const wasEditing = cfg.editingId;
     if (wasEditing){
         const idx = cfg.items.findIndex(x => String(x.id) === String(cfg.editingId));
-        if (idx >= 0) cfg.items[idx] = item;
+        if (idx >= 0){
+            // Giữ lại các trường của tính năng "đọc online theo trang" (tab Tài liệu doc).
+            // Không có đoạn này thì mỗi lần admin sửa tiêu đề/giá là tài liệu mất luôn
+            // trạng thái đã tách trang -> khách hết xem online được.
+            const old = cfg.items[idx] || {};
+            ['preview_mode','pages_ready','pages_total','free_pages','render_width','page_w','page_h','access'].forEach(k => {
+                if (old[k] !== undefined && item[k] === undefined) item[k] = old[k];
+            });
+            cfg.items[idx] = item;
+        }
     } else {
         cfg.items.push(item);
     }
@@ -4150,13 +4273,16 @@ async function saveContentList(subKey){
     const payload = (data && data.payload) ? data.payload : Object.assign({}, CONTENT_DEFAULTS[cfg.settingsKey] || {});
     if (cfg.meta.docTypeField){
         // Tách lại danh sách gộp thành 2 mảng free/paid để trang chủ (index.html) đọc như cũ.
-        payload.free = cfg.items.filter(it => it.type !== 'paid').map(it => {
-            const { type, ...rest } = it;
+        // BUG CŨ (đã sửa): lọc "khác paid" vô tình gồm luôn cả 'vip' -> tài liệu VIP
+        // bị ghi lặp thêm 1 bản vào free[] mỗi lần lưu, gây trùng lặp tăng dần theo mỗi lần Lưu.
+        payload.free = cfg.items.filter(it => it.type === 'free').map(it => {
+            const { type, access, ...rest } = it;
             return Object.assign({}, rest, { price: 0 });
         });
-        payload.paid = cfg.items.filter(it => it.type === 'paid').map(it => {
+        payload.paid = cfg.items.filter(it => it.type === 'paid' || it.type === 'vip').map(it => {
             const { type, ...rest } = it;
-            return rest;
+            // vip -> access:'pro', giá 0 (không bán lẻ); trả phí thường -> access:'buy'
+            return Object.assign({}, rest, it.type === 'vip' ? { access: 'pro', price: 0 } : { access: 'buy' });
         });
     } else {
         payload[cfg.arrayField] = cfg.items;
@@ -5189,37 +5315,64 @@ function deleteNotify(id){
     );
 }
 
-// ---------- MODAL: soạn & gửi thông báo riêng cho 1 thành viên ----------
-// Nếu gọi với userId có sẵn (từ trang chi tiết 1 tài khoản) -> chọn sẵn người nhận đó.
-// Nếu gọi không có tham số (từ tab "Thông báo thành viên") -> cho tìm/chọn người nhận.
+// ---------- MODAL: soạn & gửi thông báo — cho 1 thành viên HOẶC tất cả ----------
+// Nếu gọi với userId có sẵn (từ trang chi tiết 1 tài khoản) -> chọn sẵn người nhận đó,
+// khoá luôn ở chế độ "gửi riêng" (không cho đổi sang "tất cả" trong ngữ cảnh này).
+// Nếu gọi không có tham số (từ tab "Thông báo thành viên") -> cho chọn phạm vi gửi:
+// "Gửi riêng 1 người" (tìm/chọn người nhận) hoặc "Gửi cho tất cả thành viên" (broadcast).
+// Cả 2 chế độ đều có thể bật thêm "Gửi kèm email" để gửi email tới hộp thư người nhận.
 let notifyPickedUserId = null;
+let notifyScope = 'one'; // 'one' | 'all'
 async function openNotifyComposeModal(userId){
     await ensureAccountsCacheLoaded();
     notifyPickedUserId = userId || null;
+    notifyScope = 'one'; // luôn bắt đầu ở "gửi riêng"; nếu không có userId thì admin tự chọn thêm "tất cả"
     renderNotifyComposeForm();
     document.getElementById('acctFormOverlay').classList.remove('hidden');
 }
+function setNotifyScope(scope){
+    notifyScope = scope;
+    renderNotifyComposeForm();
+}
 function renderNotifyComposeForm(){
     const picked = notifyPickedUserId ? (accountsCache || []).find(x => x.id === notifyPickedUserId) : null;
-    document.getElementById('acctFormBox').innerHTML = `
-        <h4>🔔 Gửi thông báo riêng</h4>
-        ${picked
+    const lockedToOne = !!picked; // đã có userId truyền sẵn (mở từ trang chi tiết tài khoản) -> không cho đổi phạm vi
+    const totalMembers = (accountsCache || []).length;
+
+    const scopeSwitchHtml = lockedToOne ? '' : `
+        <div class="notify-scope-switch" style="display:flex;gap:8px;margin:0 0 12px;">
+            <button type="button" class="acct-chip${notifyScope === 'one' ? ' active' : ''}" onclick="setNotifyScope('one')" style="flex:1;">👤 Gửi riêng 1 người</button>
+            <button type="button" class="acct-chip${notifyScope === 'all' ? ' active' : ''}" onclick="setNotifyScope('all')" style="flex:1;">📢 Gửi tất cả thành viên</button>
+        </div>`;
+
+    const recipientHtml = notifyScope === 'all'
+        ? `<p class="acct-form-target">Sẽ gửi tới <b>toàn bộ ${totalMembers} thành viên</b> hiện có trong hệ thống.</p>`
+        : (picked
             ? `<p class="acct-form-target">Gửi tới <b>${escapeHtml(picked.full_name || picked.email || '')}</b> (${escapeHtml(picked.email || '')})</p>`
             : `
             <label style="margin-top:0;">Người nhận</label>
             <input id="notifyRecipientSearch" placeholder="Tìm theo email hoặc tên..." oninput="renderNotifyRecipientOptions()">
             <div id="notifyRecipientOptions"></div>
-            `}
+            `);
+
+    document.getElementById('acctFormBox').innerHTML = `
+        <h4>🔔 ${notifyScope === 'all' ? 'Gửi thông báo cho tất cả' : 'Gửi thông báo riêng'}</h4>
+        ${scopeSwitchHtml}
+        ${recipientHtml}
         <label style="margin-top:10px;">Tiêu đề</label>
         <input id="notifyTitleInput" placeholder="VD: Nhắc gia hạn gói Pro">
         <label style="margin-top:10px;">Nội dung</label>
-        <textarea id="notifyMessageInput" rows="4" placeholder="Nội dung thông báo gửi riêng cho thành viên này..."></textarea>
+        <textarea id="notifyMessageInput" rows="4" placeholder="Nội dung thông báo..."></textarea>
+        <label style="margin-top:10px;display:flex;align-items:center;gap:8px;font-weight:400;">
+            <input type="checkbox" id="notifySendEmailChk" style="width:auto;">
+            Đồng thời gửi qua email cho người nhận
+        </label>
         <div id="acctFormMsg"></div>
         <div class="acct-form-actions">
             <button class="btn-acct-cancel" onclick="closeAcctFormModal()">Hủy</button>
-            <button class="btn-acct-save" onclick="submitNotify()">Gửi thông báo</button>
+            <button class="btn-acct-save" id="notifySubmitBtn" onclick="submitNotify()">${notifyScope === 'all' ? 'Gửi cho tất cả' : 'Gửi thông báo'}</button>
         </div>`;
-    if (!picked) renderNotifyRecipientOptions();
+    if (notifyScope === 'one' && !picked) renderNotifyRecipientOptions();
 }
 function renderNotifyRecipientOptions(){
     const wrap = document.getElementById('notifyRecipientOptions');
@@ -5242,20 +5395,47 @@ async function submitNotify(){
     const msg = document.getElementById('acctFormMsg');
     const title = document.getElementById('notifyTitleInput').value.trim();
     const message = document.getElementById('notifyMessageInput').value.trim();
-    if (!notifyPickedUserId){ msg.className='err'; msg.innerText = 'Chọn 1 người nhận trước.'; return; }
+    const sendEmail = document.getElementById('notifySendEmailChk').checked;
+    if (notifyScope === 'one' && !notifyPickedUserId){ msg.className='err'; msg.innerText = 'Chọn 1 người nhận trước.'; return; }
     if (!title || !message){ msg.className='err'; msg.innerText = 'Nhập đủ tiêu đề và nội dung.'; return; }
 
-    const { data: { user } } = await sb.auth.getUser();
-    const { error } = await sb.from('user_notifications').insert({
-        user_id: notifyPickedUserId,
-        title,
-        message,
-        created_by: user ? user.id : null
-    });
-    if (error){ msg.className='err'; msg.innerText = 'Lỗi gửi: ' + error.message; return; }
+    if (notifyScope === 'all'){
+        showConfirm(
+            'Gửi cho TẤT CẢ thành viên?',
+            `Thông báo này sẽ được gửi tới toàn bộ ${(accountsCache||[]).length} thành viên${sendEmail ? ' (kèm email)' : ''}. Không thể hoàn tác. Tiếp tục?`,
+            () => doSubmitNotify(title, message, sendEmail)
+        );
+        return;
+    }
+    doSubmitNotify(title, message, sendEmail);
+}
+
+async function doSubmitNotify(title, message, sendEmail){
+    const msg = document.getElementById('acctFormMsg');
+    const btn = document.getElementById('notifySubmitBtn');
+    if (btn){ btn.disabled = true; btn.innerText = 'Đang gửi...'; }
+    msg.className = ''; msg.innerText = '';
+
+    const payload = { scope: notifyScope, title, message, send_email: sendEmail };
+    if (notifyScope === 'one') payload.user_id = notifyPickedUserId;
+
+    const { data, error } = await sb.functions.invoke('send-user-notification', { body: payload });
+
+    if (error || (data && data.error)){
+        if (btn){ btn.disabled = false; btn.innerText = notifyScope === 'all' ? 'Gửi cho tất cả' : 'Gửi thông báo'; }
+        msg.className = 'err';
+        msg.innerText = 'Lỗi gửi: ' + ((data && data.error) || error.message || 'Không gửi được.');
+        return;
+    }
+
     closeAcctFormModal();
-    showMsg('Đã gửi thông báo.', 'ok');
+    let okText = notifyScope === 'all'
+        ? `Đã gửi thông báo cho ${data.recipients} thành viên.`
+        : 'Đã gửi thông báo.';
+    if (sendEmail) okText += ` Email: ${data.emails_sent} thành công${data.emails_failed ? ', ' + data.emails_failed + ' lỗi' : ''}.`;
+    showMsg(okText, 'ok');
     notifyPickedUserId = null;
+    notifyScope = 'one';
     if (!document.getElementById('notifyPanel').classList.contains('hidden')) loadNotifyList();
 }
 
@@ -6003,17 +6183,21 @@ async function openSettingsPanel(key){
         document.getElementById('setThemeCardRadius').value = currentSetPayload.cardRadius || 16;
         document.getElementById('setThemeShowIllustration').checked = currentSetPayload.showIllustration !== false;
 
+        // Đã từng lưu cấu hình -> hiện đúng những gì đã lưu (ô trống giữ TRỐNG = ẩn ở trang chủ).
+        // Chưa từng lưu -> điền giá trị mẫu lần đầu cho dễ sửa.
+        const hasSP = !!currentSetPayload.socialProof;
         const sp = currentSetPayload.socialProof || {};
+        const spVal = (k, d) => (hasSP && typeof sp[k] === 'string') ? sp[k] : d;
         document.getElementById('setThemeSPType').value = sp.type || 'avatars';
-        document.getElementById('setThemeSPCount').value = sp.count || '1.240 bạn';
-        document.getElementById('setThemeSPSuffix').value = sp.suffix || 'đang ôn tập tuần này';
+        document.getElementById('setThemeSPCount').value = spVal('count', '1.240 bạn');
+        document.getElementById('setThemeSPSuffix').value = spVal('suffix', 'đang ôn tập tuần này');
         document.getElementById('setThemeSPEffect').value = sp.effect || 'none';
-        document.getElementById('setThemeSPBadgeIcon').value = sp.badgeIcon || 'fa-solid fa-star';
-        document.getElementById('setThemeSPBadgeText').value = sp.badgeText || '4.9/5 từ 320 đánh giá';
+        document.getElementById('setThemeSPBadgeIcon').value = spVal('badgeIcon', 'fa-solid fa-star');
+        document.getElementById('setThemeSPBadgeText').value = spVal('badgeText', '4.9/5 từ 320 đánh giá');
         const defaultAvts = [{letter:'H',color:'#4f6bff'},{letter:'L',color:'#8b5cf6'},{letter:'M',color:'#17b26a'},{letter:'T',color:'#f5a524'}];
         const avts = (sp.avatars && sp.avatars.length === 4) ? sp.avatars : defaultAvts;
         avts.forEach((a, i) => {
-            document.getElementById(`setThemeAvt${i+1}Letter`).value = a.letter || defaultAvts[i].letter;
+            document.getElementById(`setThemeAvt${i+1}Letter`).value = (typeof a.letter === 'string') ? a.letter : defaultAvts[i].letter;
             document.getElementById(`setThemeAvt${i+1}Color`).value = a.color || defaultAvts[i].color;
         });
         onThemeSPTypeChange();
@@ -6348,7 +6532,7 @@ async function saveSiteSetting(){
                 badgeIcon: document.getElementById('setThemeSPBadgeIcon').value.trim(),
                 badgeText: document.getElementById('setThemeSPBadgeText').value.trim(),
                 avatars: [1,2,3,4].map(i => ({
-                    letter: document.getElementById(`setThemeAvt${i}Letter`).value.trim() || '?',
+                    letter: document.getElementById(`setThemeAvt${i}Letter`).value.trim(), // để trống = ẩn avatar đó
                     color: document.getElementById(`setThemeAvt${i}Color`).value,
                 })),
             },

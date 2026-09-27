@@ -117,8 +117,8 @@ const toast = document.getElementById('toast');
     bindLockedCards();
 
     // ---------------- ĐỒNG BỘ MÔN HỌC VỚI SUPABASE ----------------
-    const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+    const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ---------------- ĐĂNG NHẬP / ĐĂNG KÝ — chỉ chặn khi bấm vào Trắc nghiệm, Tài liệu, Công cụ, Sản phẩm ----------------
@@ -707,6 +707,38 @@ const toast = document.getElementById('toast');
 
     renderSubjectGrids();
 
+    // ---------------- QUY TẮC CHUNG: ô nào admin để TRỐNG thì ẨN, không dùng chữ mặc định ----------------
+    // - Trường CHƯA TỪNG được lưu (undefined)  -> giữ nội dung mặc định trong HTML.
+    // - Trường đã lưu nhưng để trống ("")       -> ẩn hẳn phần tử đó.
+    function isBlankField(obj, key){
+        return !!obj && typeof obj[key] === 'string' && obj[key].trim() === '';
+    }
+    function hasField(obj, key){
+        return !!obj && typeof obj[key] === 'string';
+    }
+    // Ẩn 1 phần tử; nếu cha là .sec-head mà không còn con nào hiện thì ẩn luôn cả cha (đỡ chừa khoảng trống).
+    function hideEl(el){
+        if (!el) return;
+        el.style.display = 'none';
+        const parent = el.parentElement;
+        if (parent && parent.classList.contains('sec-head') &&
+            Array.from(parent.children).every(c => c === el || c.style.display === 'none')){
+            parent.style.display = 'none';
+        }
+    }
+    function showEl(el){
+        if (!el) return;
+        el.style.display = '';
+        const parent = el.parentElement;
+        if (parent && parent.classList.contains('sec-head')) parent.style.display = '';
+    }
+    // Gán chữ nếu có, ẩn nếu để trống, giữ mặc định nếu chưa từng cấu hình.
+    function applyTextOrHide(el, obj, key){
+        if (!el || !hasField(obj, key)) return;
+        const v = obj[key].trim();
+        if (v){ el.textContent = v; showEl(el); } else { hideEl(el); }
+    }
+
     // ---------------- KHỐI GIỚI THIỆU (hero) — đọc từ Supabase site_settings ----------------
     async function loadHeroSettings(){
         let revealed = false;
@@ -719,12 +751,12 @@ const toast = document.getElementById('toast');
         // Phòng khi mạng chậm/treo lâu -> vẫn hiện chữ mặc định ra sau 2.5s, không để trắng mãi
         const safetyTimer = setTimeout(reveal, 2500);
         try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', 'home_hero').single();
+            const { data, error } = await sb.from('site_settings').select('payload').eq('key', 'home_hero').single();
             if (error || !data || !data.payload) return; // chưa cấu hình -> giữ nội dung tĩnh mặc định
             const hero = data.payload;
             if (hero.pageTitle) document.title = hero.pageTitle;
-            if (hero.eyebrow) document.getElementById('heroEyebrow').textContent = hero.eyebrow;
-            if (hero.title)   document.getElementById('heroTitle').textContent = hero.title;
+            applyTextOrHide(document.getElementById('heroEyebrow'), hero, 'eyebrow');
+            applyTextOrHide(document.getElementById('heroTitle'),   hero, 'title');
         } finally {
             // Chỉ hiện chữ ra SAU KHI đã biết chắc nội dung cuối cùng (mặc định hoặc tuỳ chỉnh)
             // -> tránh hiện tượng nháy chữ mặc định rồi đổi sang chữ tuỳ chỉnh khi tải trang.
@@ -738,7 +770,7 @@ const toast = document.getElementById('toast');
     // Cho phép admin đổi bộ màu gradient của toàn site mà không cần sửa code, quản lý ở trang admin > Giao diện.
     async function loadThemeSettings(){
         try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', 'site_theme').single();
+            const { data, error } = await sb.from('site_settings').select('payload').eq('key', 'site_theme').single();
             if (error || !data || !data.payload) return; // chưa cấu hình -> giữ bộ màu mặc định trong CSS
             const t = data.payload;
             const root = document.documentElement.style;
@@ -766,18 +798,43 @@ const toast = document.getElementById('toast');
             if (badgeAlt) badgeAlt.classList.toggle('hidden', spType !== 'badge');
             if (spType === 'avatars' && avatarGroup){
                 avatarGroup.setAttribute('data-effect', sp.effect || 'none');
-                if (sp.count) document.getElementById('avatarCount').textContent = sp.count;
-                if (sp.suffix) document.getElementById('avatarSuffix').textContent = sp.suffix;
+                const countEl = document.getElementById('avatarCount');
+                const suffixEl = document.getElementById('avatarSuffix');
+                applyTextOrHide(countEl, sp, 'count');
+                applyTextOrHide(suffixEl, sp, 'suffix');
                 const avts = document.querySelectorAll('#avatarStack .mini-avt');
-                (sp.avatars || []).slice(0,4).forEach((a, i) => {
-                    if (!avts[i]) return;
-                    if (a.letter) avts[i].textContent = a.letter;
-                    if (a.color)  avts[i].style.background = a.color;
-                });
+                if (Array.isArray(sp.avatars)){
+                    avts.forEach((el, i) => {
+                        const a = sp.avatars[i];
+                        // Không có dữ liệu hoặc để trống chữ cái -> ẩn avatar đó
+                        if (!a || !String(a.letter || '').trim()){ el.style.display = 'none'; return; }
+                        el.style.display = '';
+                        el.textContent = String(a.letter).trim();
+                        if (a.color) el.style.background = a.color;
+                    });
+                }
+                // Ẩn cả nhóm nếu không còn gì để hiện (không avatar + không chữ)
+                const anyAvatar = Array.from(avts).some(el => el.style.display !== 'none');
+                const anyText = [countEl, suffixEl].some(el => el && el.style.display !== 'none');
+                const stack = document.getElementById('avatarStack');
+                if (stack) stack.style.display = anyAvatar ? '' : 'none';
+                const agText = avatarGroup.querySelector('.ag-text');
+                if (agText) agText.style.display = anyText ? '' : 'none';
+                if (!anyAvatar && !anyText) avatarGroup.style.display = 'none';
             } else if (spType === 'badge' && badgeAlt){
                 badgeAlt.setAttribute('data-effect', sp.effect || 'none');
-                if (sp.badgeIcon) document.getElementById('heroBadgeIcon').className = sp.badgeIcon;
-                if (sp.badgeText) document.getElementById('heroBadgeText').textContent = sp.badgeText;
+                const iconEl = document.getElementById('heroBadgeIcon');
+                const textEl = document.getElementById('heroBadgeText');
+                if (hasField(sp, 'badgeIcon')){
+                    if (sp.badgeIcon.trim()){ iconEl.className = sp.badgeIcon.trim(); iconEl.style.display = ''; }
+                    else iconEl.style.display = 'none';
+                }
+                applyTextOrHide(textEl, sp, 'badgeText');
+                // Không có chữ -> chỉ còn icon: thêm class để CSS canh giữa dạng viên tròn thay vì pill lệch.
+                badgeAlt.classList.toggle('icon-only', textEl.style.display === 'none');
+                // Huy hiệu trống cả icon lẫn chữ -> ẩn hẳn
+                if (iconEl.style.display === 'none' && textEl.style.display === 'none') badgeAlt.style.display = 'none';
+                else badgeAlt.style.display = '';
             }
         }catch(e){ /* mạng lỗi -> im lặng giữ mặc định, không chặn trang tải */ }
     }
@@ -801,8 +858,12 @@ const toast = document.getElementById('toast');
             productSectionTitle: payload.productTitle,
         };
         Object.keys(map).forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
             const val = map[id];
-            if (val){ const el = document.getElementById(id); if (el) el.textContent = val; }
+            if (typeof val !== 'string') return;      // chưa từng cấu hình -> giữ mặc định
+            if (val.trim()){ el.textContent = val.trim(); showEl(el); }
+            else hideEl(el);                          // admin để trống -> ẩn tiêu đề
         });
     }
     loadHomeTexts();
@@ -810,7 +871,7 @@ const toast = document.getElementById('toast');
     // ---------------- CHÂN TRANG — đọc từ Supabase site_settings, đồng bộ mọi trang ----------------
     async function loadFooterSettings(){
         const el = document.getElementById('siteFooter');
-        const { data, error } = await sb.from('site_settings').select('*').eq('key', 'site_footer').single();
+        const { data, error } = await sb.from('site_settings').select('payload').eq('key', 'site_footer').single();
         if (error || !data || !data.payload || !data.payload.text){
             if (el) el.textContent = ''; // chưa cấu hình ở admin -> để trống, không dùng chữ mặc định
             return;
@@ -820,13 +881,30 @@ const toast = document.getElementById('toast');
     loadFooterSettings();
 
     // ---------------- TÀI LIỆU / CÔNG CỤ / SẢN PHẨM — nội dung động, quản lý ở trang admin (site_settings) ----------------
-    async function fetchSiteSettingPayload(key, fallback){
-        try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', key).single();
-            if (error || !data || !data.payload) return fallback;
-            return data.payload;
-        }catch(e){ return fallback; }
+    // Cache theo từng "key" trong phạm vi 1 lượt tải trang (SPA — index.html không reload
+    // giữa các tab). TRƯỚC ĐÂY hàm này gọi thẳng Supabase mỗi lần được gọi, mà cùng 1 key
+    // (doc_content, product_content...) lại được gọi ở NHIỀU chỗ khác nhau trong cùng 1 lần
+    // vào trang (renderDocContent, tìm kiếm, khởi tạo tab...) -> tải lặp lại y hệt 1 payload
+    // JSON lớn 3-4 lần mỗi lượt truy cập, chính là nguyên nhân Cached Egress tăng rất nhanh.
+    // Cache theo Promise (không phải theo giá trị) để nếu nhiều nơi gọi gần như cùng lúc,
+    // trước khi request đầu tiên kịp trả lời, chúng vẫn dùng chung 1 request đang chạy.
+    const _siteSettingCache = {};
+    function fetchSiteSettingPayload(key, fallback){
+        if (_siteSettingCache[key]) return _siteSettingCache[key];
+        const p = (async () => {
+            try{
+                const { data, error } = await sb.from('site_settings').select('payload').eq('key', key).single();
+                if (error || !data || !data.payload) return fallback;
+                return data.payload;
+            }catch(e){ return fallback; }
+        })();
+        _siteSettingCache[key] = p;
+        return p;
     }
+    // Xoá cache của 1 key khi biết chắc nội dung vừa đổi (ví dụ sau khi mua hàng thành công
+    // và server có thể trả dữ liệu khác cho lần render kế tiếp) -> lần gọi renderXxxContent()
+    // tiếp theo sẽ tải lại bản mới nhất thay vì dùng mãi bản cache cũ trong suốt phiên.
+    function invalidateSiteSettingCache(key){ delete _siteSettingCache[key]; }
 
     const DEFAULT_DOC_CONTENT = { free: [], paid: [] };
     const DEFAULT_TOOL_CONTENT = { items: [
@@ -902,7 +980,7 @@ const toast = document.getElementById('toast');
         return false;
     }
 
-    function docItemCardHtml(item, isPaid){
+    function docItemCardHtml(item, isPaid, isPro){
         const metaHtml = item.size ? `<div class="doc-meta"><i class="fa-solid fa-file-lines"></i> ${escapeHtmlHome(item.size)}</div>` : '';
         const descHtml = item.desc ? `<div class="doc-desc">${escapeHtmlHome(item.desc)}</div>` : '';
         const topHtml = item.image
@@ -936,6 +1014,32 @@ const toast = document.getElementById('toast');
         const priceLabel = Number(item.price) > 0 ? Number(item.price).toLocaleString('vi-VN') + 'đ' : '';
         const idAttr = escapeHtmlHome(docId);
 
+        // Loại 3: tài liệu VIP (item.access === 'pro') — không bán lẻ, nạp Pro là xem/đọc online được.
+        // Nếu người xem hiện tại ĐÃ có Pro rồi thì không được hiện "Nâng cấp/cần Pro" nữa —
+        // phải cho họ 1 nút "Xem/Đọc online" đi thẳng vào nội dung.
+        if (item.access === 'pro'){
+            const readOnline = item.preview_mode === 'pages' && item.pages_ready;
+            let ctaIcon, ctaText;
+            if (isPro){
+                ctaIcon = readOnline ? 'fa-book-open' : (item.link ? 'fa-download' : 'fa-crown');
+                ctaText = readOnline ? 'Đọc ngay' : (item.link ? 'Xem tài liệu' : 'Đang cập nhật nội dung');
+            } else {
+                ctaIcon = readOnline ? 'fa-book-open' : 'fa-crown';
+                ctaText = readOnline ? 'Đọc ngay' : 'Nâng cấp Pro để xem';
+            }
+            return `
+                <a class="doc-card ${isPro ? 'is-owned' : 'is-paid'}" data-cat="paid" href="chi-tiet.html?type=doc&id=${idAttr}">
+                    <div class="${topClass}">
+                        ${topHtml || iconHtml}
+                        <span class="doc-tag ${isPro ? 'owned' : 'paid'}"><i class="fa-solid fa-crown"></i> VIP</span>
+                    </div>
+                    <div class="doc-title">${escapeHtmlHome(item.title || '')}</div>
+                    ${metaHtml}
+                    ${descHtml}
+                    <div class="doc-cta"><i class="fa-solid ${ctaIcon}"></i> ${ctaText}</div>
+                </a>`;
+        }
+
         if (owned){
             return `
                 <a class="doc-card is-owned" data-cat="paid" href="chi-tiet.html?type=doc&id=${idAttr}">
@@ -963,21 +1067,56 @@ const toast = document.getElementById('toast');
             </a>`;
     }
 
+    // Khử trùng NGAY TRONG 1 mảng: nếu do lỗi thao tác ở admin, 1 ID vô tình bị lưu thành 2 dòng
+    // riêng biệt trong cùng free[]/paid[] (khác `title`/`desc` do sửa nhầm), chỉ hiện ĐÚNG 1 thẻ,
+    // ưu tiên giữ bản đã tách trang xong (pages_ready) — đó mới là bản "sống" khách xem được;
+    // nếu cả 2 đều chưa tách trang thì giữ bản xuất hiện sau (thường là bản admin sửa gần nhất).
+    // Việc này cũng chặn hẳn tình trạng bấm vào 1 trong 2 thẻ trùng lại nhận nhầm dữ liệu của thẻ kia
+    // (2 thẻ cùng id -> cùng link chi-tiet.html?id=... -> trang chi tiết/đọc-online chỉ tìm thấy bản đầu tiên).
+    function dedupeDocsById(list){
+        const byId = new Map();
+        list.forEach(it => {
+            const key = String(it.id);
+            const existing = byId.get(key);
+            if (!existing){ byId.set(key, it); return; }
+            const existingReady = existing.preview_mode === 'pages' && existing.pages_ready;
+            const itReady = it.preview_mode === 'pages' && it.pages_ready;
+            if (itReady || !existingReady) byId.set(key, it);
+        });
+        return Array.from(byId.values());
+    }
+
     async function renderDocContent(){
         const payload = await fetchSiteSettingPayload('doc_content', DEFAULT_DOC_CONTENT);
         // Tài liệu bị ẩn (item.hidden) không hiện trong danh sách công khai.
         // Ngoại lệ: tài liệu trả phí khách đã mua rồi vẫn hiện để họ tải lại được, dù admin đã ẩn khỏi trang chủ.
-        const free = (Array.isArray(payload.free) ? payload.free : []).filter(it => !it.hidden);
-        const paid = (Array.isArray(payload.paid) ? payload.paid : []).filter(it => !it.hidden || purchasedDocIds.has(String(it.id)));
+        let free = (Array.isArray(payload.free) ? payload.free : []).filter(it => !it.hidden);
+        let paid = (Array.isArray(payload.paid) ? payload.paid : []).filter(it => !it.hidden || purchasedDocIds.has(String(it.id)));
+        free = dedupeDocsById(free);
+        paid = dedupeDocsById(paid);
+        // Rào chắn: nếu 1 ID lỡ nằm ở cả free[] và paid[] (dữ liệu cũ từ 1 bug đã sửa ở admin),
+        // không hiện 2 thẻ trùng ngoài trang chủ — ưu tiên giữ bản trả phí/VIP.
+        const paidIds = new Set(paid.map(it => String(it.id)));
+        free = free.filter(it => !paidIds.has(String(it.id)));
         DOC_PAID_ITEMS_MAP = {};
+
+        // Lấy trạng thái Pro MỚI NHẤT (không dựa vào session đã cache có thể bị cũ nếu vừa được
+        // admin cộng Pro / vừa gia hạn) để thẻ VIP hiện đúng "Xem/Đọc online" thay vì "Nâng cấp Pro".
+        let isPro = false;
+        try{
+            const { data } = await sb.auth.getUser();
+            isPro = !!(data && data.user && window.SNG_USAGE && SNG_USAGE.isProActive(data.user));
+        }catch(e){
+            isPro = !!(currentSession && window.SNG_USAGE && SNG_USAGE.isProActive(currentSession.user));
+        }
 
         const allGrid = document.getElementById('docAllGrid');
         const allCount = document.getElementById('docAllCount');
         const total = free.length + paid.length;
         if (allCount) allCount.textContent = total + ' tài liệu';
 
-        const cardsHtml = free.map(it => docItemCardHtml(it, false)).join('')
-            + paid.map(it => docItemCardHtml(it, true)).join('');
+        const cardsHtml = free.map(it => docItemCardHtml(it, false, isPro)).join('')
+            + paid.map(it => docItemCardHtml(it, true, isPro)).join('');
 
         allGrid.innerHTML = total
             ? `<div class="doc-grid">${cardsHtml}</div>`
@@ -1500,8 +1639,7 @@ const toast = document.getElementById('toast');
         intro_desc: 'Câu hỏi sai, đáp án chưa rõ, hay muốn góp ý thêm tính năng — cứ nhắn. Đội SNG EDU đọc và trả lời trực tiếp, không qua chatbot.',
         contacts: [
             { id:'c1', icon:'fa-solid fa-comment-dots', color:'blue',  title:'Nhắn Zalo',            desc:'Mở Zalo, nhắn thẳng cho admin', status_label:'Phản hồi trong ngày', link:'https://zalo.me/0825160035' },
-            { id:'c2', icon:'fa-solid fa-pen-to-square', color:'green', title:'Gửi form góp ý',   desc:'Điền ngay trên web, không cần rời trang',           status_label:'Kèm ảnh, chọn đúng môn & câu',    link:'gop-y.html' },
-            { id:'c3', icon:'fa-solid fa-gift', color:'amber', title:'Nhận Pro miễn phí', desc:'Đổi tài liệu, báo lỗi hoặc giới thiệu bạn bè để nhận Premium', status_label:'Không cần thanh toán', link:'nhan-pro.html' }
+            { id:'c2', icon:'fa-solid fa-pen-to-square', color:'green', title:'Gửi form góp ý',   desc:'Điền ngay trên web, không cần rời trang',           status_label:'Kèm ảnh, chọn đúng môn & câu',    link:'gop-y.html' }
         ],
         faq: [
             { id:'f1', title:'Tài liệu và trắc nghiệm trên SNG EDU có mất phí không?', desc:'Toàn bộ học phần đang mở đều miễn phí 100%. Nếu SNG EDU ra thêm gói nâng cao, bạn sẽ được báo trước — không có chuyện tự động trừ phí.' },
@@ -1545,10 +1683,18 @@ const toast = document.getElementById('toast');
 
         const titleEl = document.getElementById('supportIntroTitle');
         const descEl = document.getElementById('supportIntroDesc');
-        if (titleEl) titleEl.textContent = payload.intro_title || DEFAULT_SUPPORT_CONTENT.intro_title;
-        if (descEl) descEl.textContent = payload.intro_desc || DEFAULT_SUPPORT_CONTENT.intro_desc;
+        if (titleEl){
+            if (isBlankField(payload, 'intro_title')) titleEl.style.display = 'none';
+            else { titleEl.style.display = ''; titleEl.textContent = payload.intro_title || DEFAULT_SUPPORT_CONTENT.intro_title; }
+        }
+        if (descEl){
+            if (isBlankField(payload, 'intro_desc')) descEl.style.display = 'none';
+            else { descEl.style.display = ''; descEl.textContent = payload.intro_desc || DEFAULT_SUPPORT_CONTENT.intro_desc; }
+        }
 
-        const contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
+        // Ẩn thẻ "Nhận Pro miễn phí" (kể cả khi đã được lưu sẵn trong DB / admin)
+        const contacts = (Array.isArray(payload.contacts) ? payload.contacts : [])
+            .filter(c => !(c && (/nhan-pro/i.test(String(c.link || '')) || /Nhận Pro miễn phí/i.test(String(c.title || '')))));
         const contactsGrid = document.getElementById('supportContactsGrid');
         if (contactsGrid){
             contactsGrid.innerHTML = contacts.length
@@ -1636,7 +1782,7 @@ const toast = document.getElementById('toast');
         const banner = document.getElementById('promoBanner');
         if (!banner) return;
         try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', 'promo_banner').single();
+            const { data, error } = await sb.from('site_settings').select('payload, updated_at').eq('key', 'promo_banner').single();
             const payload = (!error && data && data.payload) ? data.payload : null;
 
             if (promoCountdownTimer){ clearInterval(promoCountdownTimer); promoCountdownTimer = null; }
@@ -1717,7 +1863,7 @@ const toast = document.getElementById('toast');
         const overlay = document.getElementById('announcePopupOverlay');
         if (!overlay) return;
         try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', 'announcement_popup').single();
+            const { data, error } = await sb.from('site_settings').select('payload, updated_at').eq('key', 'announcement_popup').single();
             const payload = (!error && data && data.payload) ? data.payload : null;
 
             if (!payload || !payload.enabled || !(payload.message || '').trim()){ overlay.classList.add('hidden'); return; }
@@ -1756,7 +1902,7 @@ const toast = document.getElementById('toast');
     // Tải danh sách tính năng do admin cấu hình (trang admin > Cài đặt > "Tính năng gói Pro") — nếu chưa cấu hình thì dùng mặc định ở trên.
     async function loadProUpgradeFeaturesConfig(){
         try{
-            const { data, error } = await sb.from('site_settings').select('*').eq('key', 'pro_features').single();
+            const { data, error } = await sb.from('site_settings').select('payload').eq('key', 'pro_features').single();
             const items = (!error && data && data.payload && Array.isArray(data.payload.items)) ? data.payload.items : null;
             if (items && items.length) PRO_UPGRADE_FEATURES = items;
         }catch(e){ /* giữ nguyên danh sách mặc định nếu lỗi mạng/chưa có bảng */ }
@@ -2631,7 +2777,16 @@ const toast = document.getElementById('toast');
     })();
 
     (async function initSideNav(){
-        const { data: { session } } = await sb.auth.getSession();
+        let { data: { session } } = await sb.auth.getSession();
+        // Làm mới session từ server ngay khi vào trang, để nếu tài khoản vừa được admin cộng/gia
+        // hạn Pro thì mọi UI phụ thuộc Pro (thẻ VIP, badge tài khoản...) nhận ra ngay lần tải này,
+        // không phải đợi token tự refresh hoặc phải đăng xuất/đăng nhập lại.
+        if (session){
+            try{
+                const { data, error } = await sb.auth.refreshSession();
+                if (!error && data && data.session) session = data.session;
+            }catch(e){}
+        }
         currentSession = session;
         updateAccountUI();
         loadPaymentSettings();

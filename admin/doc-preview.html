@@ -67,6 +67,39 @@
     .msg.err{ background:var(--red-bg); color:var(--red); display:block; }
     .empty{ text-align:center; padding:60px 20px; color:var(--ink-mute); }
     .gate{ max-width:380px; margin:80px auto; text-align:center; }
+    .card-actions-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .btn-sm{ padding:7px 12px; font-size:.78rem; }
+    .badge.hidden-badge{ background:var(--red-bg); color:var(--red); }
+    .modal-overlay{ position:fixed; inset:0; background:rgba(10,14,26,.55); backdrop-filter:blur(2px); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; z-index:50; }
+    .modal-overlay.show{ display:flex; }
+    .modal-card{ background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:22px 22px 20px; width:100%; max-width:480px; }
+    .modal-card h3{ margin:0 0 4px; font-size:1.05rem; font-weight:800; }
+    .modal-card p.sub{ margin:0 0 16px; }
+    .field-full{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+    .field-full label{ font-size:.76rem; font-weight:700; color:var(--ink-mute); }
+    .field-full input[type=text], .field-full input[type=number], .field-full textarea{
+        padding:9px 11px; border-radius:9px; border:1px solid var(--line); background:var(--bg); color:var(--ink);
+        font-family:inherit; font-size:.86rem; width:100%;
+    }
+    .field-full textarea{ resize:vertical; min-height:60px; font-family:inherit; }
+    .upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+    .upload-name{ font-size:.78rem; color:var(--ink-mute); }
+    .check-row{ display:flex; align-items:center; gap:8px; font-size:.84rem; color:var(--ink-soft); margin-bottom:14px; cursor:pointer; }
+    .cover-thumb{ width:64px; height:40px; object-fit:cover; border-radius:6px; border:1px solid var(--line); }
+    .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:6px; }
+    .type-toggle{ display:flex; gap:8px; margin-top:6px; }
+    .type-opt{
+        flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+        padding:10px 8px; border-radius:10px; border:1px solid var(--line); background:var(--bg);
+        color:var(--ink-mute); font-size:.78rem; font-weight:700; cursor:pointer; text-align:center; user-select:none;
+    }
+    .type-opt small{ font-weight:500; font-size:.68rem; opacity:.85; }
+    .type-opt:hover{ border-color:var(--brand2); }
+    .type-opt.selected[data-type="free"]{ background:var(--green-bg); border-color:var(--green); color:var(--green); }
+    .type-opt.selected[data-type="paid"]{ background:var(--amber-bg); border-color:var(--amber); color:var(--amber); }
+    .type-opt.selected[data-type="vip"]{ background:rgba(245,165,36,.16); border-color:#f5a524; color:#d98a05; }
+    .badge.vip{ background:rgba(245,165,36,.16); color:#d98a05; }
+    .badge.free{ background:var(--green-bg); color:var(--green); }
 </style>
 </head>
 <body>
@@ -85,21 +118,97 @@
     </div>
     <h1>🧩 Xem trước tài liệu theo trang</h1>
     <p class="sub">
-        Chỉ áp dụng cho <b>tài liệu trả phí</b>. Sau khi tách trang, khách xem được đúng số trang
-        "free" đầu tiên (không cần mua) — xem tiếp phải <b>đang có Pro</b> hoặc <b>đã mua tài liệu này</b>.
+        Dữ liệu ở đây <b>dùng chung</b> với mục "Tài liệu" ở admin chính, gồm 3 loại:
+        <b>🆓 Miễn phí</b> (ai cũng xem/tải), <b>💰 Trả phí</b> (mua lẻ để tải file) và
+        <b>👑 Nạp VIP xem</b> (không bán lẻ, có Pro là đọc full online).
+        Với tài liệu trả phí/VIP, khách chỉ xem được số trang "free" đầu tiên, xem tiếp phải <b>đang có Pro</b>.
         File PDF gốc không public — chỉ ảnh từng trang được phát ra, có kiểm tra quyền phía server.
         Trang xem cho khách: <code>../doc-preview-viewer.html?id=&lt;id&gt;</code>
     </p>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+        <button class="btn btn-primary" onclick="openDocForm()"><i class="fa-solid fa-plus"></i> Thêm tài liệu mới</button>
+    </div>
     <div id="list"></div>
 </div>
 
+<div class="modal-overlay" id="docFormOverlay">
+    <div class="modal-card">
+        <h3 id="docFormTitle">Thêm tài liệu mới</h3>
+        <p class="sub">Tài liệu thêm/sửa ở đây <b>dùng chung dữ liệu</b> với mục "Tài liệu" ở trang admin chính — thêm bên nào cũng hiện ở cả hai.</p>
+
+        <div class="field-full">
+            <label>Loại tài liệu</label>
+            <div class="type-toggle" id="dfTypeToggle">
+                <div class="type-opt" data-type="free" onclick="pickDfType('free')"><span>🆓 Miễn phí</span><small>Ai cũng tải được</small></div>
+                <div class="type-opt" data-type="paid" onclick="pickDfType('paid')"><span>💰 Trả phí</span><small>Mua lẻ theo giá</small></div>
+                <div class="type-opt selected" data-type="vip" onclick="pickDfType('vip')"><span>👑 Nạp VIP xem</span><small>Có Pro là xem full</small></div>
+            </div>
+        </div>
+        <div class="field-full">
+            <label>Tiêu đề</label>
+            <input type="text" id="dfTitle" placeholder="VD: Learn English Tiếng Anh 1">
+        </div>
+        <div class="field-full">
+            <label>Mô tả ngắn</label>
+            <textarea id="dfDesc" placeholder="VD: Đáp án Learn English Tiếng Anh 1 — Đầy đủ &amp; Chính xác"></textarea>
+        </div>
+        <div class="field-full" id="dfPriceWrap">
+            <label>Giá bán (VNĐ)</label>
+            <input type="number" id="dfPrice" min="1" placeholder="VD: 33333">
+            <div class="upload-name" id="dfPriceHint"></div>
+        </div>
+        <div class="field-full">
+            <label>File tài liệu (PDF hoặc Word)</label>
+            <input type="file" id="dfFile" accept=".pdf,.doc,.docx" style="display:none;" onchange="onDocFileSelected()">
+            <div class="upload-row">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('dfFile').click()"><i class="fa-solid fa-paperclip"></i> Chọn file</button>
+                <span class="upload-name" id="dfFileName"></span>
+            </div>
+            <input type="hidden" id="dfLink" value="">
+        </div>
+        <div class="field-full">
+            <label>Ảnh bìa (tuỳ chọn)</label>
+            <input type="file" id="dfImage" accept="image/*" style="display:none;" onchange="onDocImageSelected()">
+            <div class="upload-row">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('dfImage').click()"><i class="fa-solid fa-image"></i> Chọn ảnh</button>
+                <img id="dfImageThumb" class="cover-thumb" style="display:none;">
+                <span class="upload-name" id="dfImageName"></span>
+                <button type="button" class="btn btn-ghost btn-sm" id="dfImageRemoveBtn" style="display:none;" onclick="removeDocImage()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="dfImageUrl" value="">
+        </div>
+        <label class="check-row"><input type="checkbox" id="dfVisible" checked> Hiển thị công khai (bỏ tick để ẩn tạm thời, không xoá)</label>
+
+        <div class="msg" id="dfMsg"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" onclick="closeDocForm()">Huỷ</button>
+            <button type="button" class="btn btn-primary" id="dfSaveBtn" onclick="saveDocForm()"><i class="fa-solid fa-check"></i> Lưu</button>
+        </div>
+    </div>
+</div>
+
 <script>
-const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const DOC_PAGES_BUCKET = 'tai-lieu-trang'; // ⚠️ Tạo bucket này trên Cloudflare R2, KHÔNG bật Public Access
 
+// ---------- Thêm/sửa tài liệu ngay tại trang này (bucket public "tai-lieu", giống trang admin chính) ----------
+const DOC_BUCKET = 'tai-lieu';
+const DOC_ALLOWED_EXT = ['pdf','doc','docx'];
+const DOC_MAX_SIZE = 100 * 1024 * 1024; // 100MB
+const DOC_IMAGE_MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const R2_PUBLIC_URLS = { 'tai-lieu': 'https://pub-1d650009eedc4c9bb38c2a0a5713407f.r2.dev' };
+
 let docList = [];
+let docFormEditIdx = null; // null = đang thêm mới, số = đang sửa docList[idx]
+
+// ?embed=1  -> đang được nhúng trong tab "Tài liệu doc" của trang admin chính:
+//              bỏ topbar/tiêu đề cho gọn, chỉ còn phần danh sách.
+// ?focus=<id> -> cuộn tới & làm nổi bật đúng tài liệu vừa bấm ở danh sách bên kia.
+const QS = new URLSearchParams(location.search);
+const IS_EMBED = QS.get('embed') === '1';
+const FOCUS_ID = QS.get('focus') || '';
 
 async function isAdminUser(){
     const { data } = await sb.auth.getUser();
@@ -123,14 +232,64 @@ async function boot(){
         return;
     }
     document.getElementById('shell').style.display = 'block';
+    if (IS_EMBED){
+        document.querySelector('.topbar').style.display = 'none';
+        document.querySelector('#shell h1').style.display = 'none';
+        document.body.style.background = 'transparent';
+        document.querySelector('.wrap').style.padding = '0 0 20px';
+        document.querySelector('.wrap').style.maxWidth = 'none';
+    }
     await loadDocs();
+    focusDocCard();
 }
 
+function focusDocCard(){
+    if (!FOCUS_ID) return;
+    const idx = docList.findIndex((it) => String(it.id) === FOCUS_ID);
+    if (idx < 0) return;
+    const card = document.getElementById('doc_' + idx);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.style.outline = '2px solid var(--brand2)';
+    card.style.transition = 'outline-color .4s ease';
+    setTimeout(() => { card.style.outline = '2px solid transparent'; }, 2600);
+}
+
+// Dữ liệu dùng chung với mục "Tài liệu" ở admin chính: doc_content.free[] + doc_content.paid[].
+// Gộp lại thành 1 danh sách, mỗi mục có item.type = 'free' | 'paid' | 'vip'.
+//   free -> mảng free[]            : ai cũng tải được
+//   paid -> mảng paid[], access buy: mua lẻ theo giá
+//   vip  -> mảng paid[], access pro: không bán lẻ, nạp VIP (Pro) là xem full
 async function loadDocs(){
     const { data } = await sb.from('site_settings').select('payload').eq('key', 'doc_content').single();
     const payload = (data && data.payload) || { free: [], paid: [] };
-    docList = Array.isArray(payload.paid) ? payload.paid : [];
+    const freeArr = Array.isArray(payload.free) ? payload.free : [];
+    const paidArr = Array.isArray(payload.paid) ? payload.paid : [];
+    const merged = freeArr.map((x) => Object.assign({}, x, { type: 'free', price: 0 }))
+        .concat(paidArr.map((x) => Object.assign({}, x, { type: x.access === 'pro' ? 'vip' : 'paid' })));
+    // Khử trùng: nếu 1 ID lỡ nằm ở CẢ HAI mảng free[]/paid[] (hậu quả 1 bug đã sửa ở admin.js —
+    // trước đây lưu tài liệu VIP bị ghi thừa 1 bản vào free[]), chỉ giữ đúng 1 bản, ưu tiên bản
+    // paid/vip (đó mới là "sự thật", bản free là bản lỗi bị ghi thừa).
+    let hadDupToClean = false;
+    const byId = new Map();
+    merged.forEach((it) => {
+        const key = String(it.id);
+        const existing = byId.get(key);
+        if (existing && (existing.type === 'free') !== (it.type === 'free')) hadDupToClean = true;
+        if (!existing || existing.type === 'free') byId.set(key, it);
+    });
+    docList = Array.from(byId.values());
     renderList();
+    if (hadDupToClean){
+        // Tự dọn database ngay lần tải đầu tiên sau khi vá lỗi, không cần bấm Lưu thủ công.
+        savePayload().catch(() => {});
+    }
+}
+
+function docTypeBadge(type){
+    if (type === 'free') return '<span class="badge free"><i class="fa-solid fa-gift"></i> Miễn phí</span>';
+    if (type === 'vip')  return '<span class="badge vip"><i class="fa-solid fa-crown"></i> Nạp VIP xem</span>';
+    return '<span class="badge off"><i class="fa-solid fa-lock"></i> Trả phí</span>';
 }
 
 function renderList(){
@@ -146,21 +305,57 @@ function renderList(){
             <div class="doc-title">${escapeHtml(item.title || '(chưa đặt tên)')}</div>
             <div class="doc-meta">
                 ID: <code>${escapeHtml(String(item.id))}</code> ·
+                ${docTypeBadge(item.type)} ·
                 <span class="badge ${ready ? 'on' : 'off'}">
                     <i class="fa-solid ${ready ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
                     ${ready ? `Đã tách ${item.pages_total || 0} trang` : 'Chưa bật xem trước theo trang'}
                 </span>
+                ${item.hidden ? `<span class="badge hidden-badge"><i class="fa-solid fa-eye-slash"></i> Đã ẩn</span>` : ''}
+                ${item.type === 'paid' && item.price ? ` · ${Number(item.price).toLocaleString('vi-VN')}đ` : ''}
+            </div>
+            <div class="doc-meta" style="margin-top:-8px;">
+                ${item.type === 'free'
+                    ? 'Tách trang xong: khách xem online <b>toàn bộ</b>, không cần đăng nhập.'
+                    : item.type === 'vip'
+                    ? `Khách xem thử <b>${item.free_pages != null ? item.free_pages : 5}</b> trang đầu, muốn xem full phải <b>nạp VIP (Pro)</b>.`
+                    : `Khách xem thử <b>${item.free_pages != null ? item.free_pages : 5}</b> trang đầu; xem full cần <b>Pro</b> (mua lẻ chỉ để tải file).`}
+            </div>
+            <div class="card-actions-row">
+                <button class="btn btn-ghost btn-sm" onclick="openDocForm(${idx})"><i class="fa-solid fa-pen"></i> Sửa</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteDoc(${idx})"><i class="fa-solid fa-trash"></i> Xoá</button>
             </div>
             <div class="row">
                 <div class="field">
                     <label>Số trang xem thử (free)</label>
                     <input type="number" min="0" id="freePages_${idx}" value="${item.free_pages != null ? item.free_pages : 5}">
                 </div>
+                ${ready ? `<button class="btn btn-ghost" onclick="saveFreePages(${idx})"><i class="fa-solid fa-floppy-disk"></i> Lưu số trang</button>` : ''}
+            </div>
+            <div class="row">
                 <div class="field">
-                    <label>File PDF gốc (để tách trang)</label>
+                    <label>Chất lượng ảnh trang</label>
+                    <select id="quality_${idx}" style="padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:.86rem;width:230px;">
+                        <option value="1600" ${item.render_width == 1600 ? 'selected' : ''}>Tiêu chuẩn — 1600px (nhẹ)</option>
+                        <option value="2200" ${item.render_width == 2200 ? 'selected' : ''}>Cao — 2200px</option>
+                        <option value="2560" ${item.render_width == 2560 ? 'selected' : ''}>Rất nét — 2560px</option>
+                        <option value="3200" ${(item.render_width == null || item.render_width == 3200) ? 'selected' : ''}>Siêu nét — 3200px (khuyên dùng)</option>
+                        <option value="3840" ${item.render_width == 3840 ? 'selected' : ''}>Cực nét — 3840px (rất nặng)</option>
+                    </select>
+                </div>
+                <div class="field" style="max-width:320px;">
+                    <label>&nbsp;</label>
+                    <div style="font-size:.76rem;color:var(--ink-mute);line-height:1.5;">
+                        Ảnh càng rộng thì chữ càng nét khi khách phóng to, đổi lại dung lượng/trang nặng hơn.
+                        ${item.render_width ? `Lần tách gần nhất: <b>${item.render_width}px</b>.` : 'Tài liệu tách trước đây dùng bản cũ (~1300px) nên bị mờ — hãy <b>tách lại</b>.'}
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="field">
+                    <label>File PDF gốc (để tách trang${ready ? ' lại' : ''})</label>
                     <input type="file" id="pdfFile_${idx}" accept="application/pdf">
                 </div>
-                <button class="btn btn-primary" onclick="processDoc(${idx})"><i class="fa-solid fa-scissors"></i> Tách trang &amp; Lưu</button>
+                <button class="btn btn-primary" onclick="processDoc(${idx})"><i class="fa-solid fa-scissors"></i> ${ready ? 'Tách lại &amp; Lưu' : 'Tách trang &amp; Lưu'}</button>
                 ${ready ? `<a class="btn btn-ghost" href="../doc-preview-viewer.html?id=${encodeURIComponent(item.id)}" target="_blank"><i class="fa-solid fa-eye"></i> Xem thử</a>` : ''}
                 ${ready ? `<button class="btn btn-ghost" onclick="togglePreview(${idx}, false)"><i class="fa-solid fa-toggle-off"></i> Tắt xem trước</button>` : ''}
             </div>
@@ -200,16 +395,24 @@ function loadPdfJs(){
     return pdfjsReady;
 }
 
-// ---------- Upload 1 trang ảnh lên R2 qua Edge Function r2-storage có sẵn ----------
+// ---------- Upload 1 trang ảnh (hoặc PDF gốc) lên R2 qua Edge Function r2-storage ----------
+// Bucket "tai-lieu-trang" là bucket riêng tư (không Public Access), nên publicUrl trả về
+// sẽ là null — không sao, chỗ gọi hàm này không cần publicUrl, chỉ cần upload thành công.
 async function r2UploadPage(path, blob){
-    const form = new FormData();
-    form.append('bucket', DOC_PAGES_BUCKET);
-    form.append('path', path);
-    form.append('file', blob, path.split('/').pop());
-    const { data, error } = await sb.functions.invoke('r2-storage', { body: form });
-    if (error) throw new Error(error.message || 'Lỗi tải ảnh trang lên R2');
-    if (!data || !data.ok) throw new Error((data && data.error) || 'Lỗi tải ảnh trang lên R2');
-    return data;
+    const { data, error } = await sb.functions.invoke('r2-storage', {
+        body: { action: 'get-upload-url', bucket: DOC_PAGES_BUCKET, path, contentType: blob.type || 'application/octet-stream' }
+    });
+    if (error) throw new Error(error.message || 'Không lấy được link upload.');
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Không lấy được link upload.');
+
+    const putRes = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+        body: blob
+    });
+    if (!putRes.ok) throw new Error('Upload lên R2 thất bại (HTTP ' + putRes.status + ').');
+
+    return { ok: true, publicUrl: data.publicUrl, path: data.path };
 }
 
 async function processDoc(idx){
@@ -239,21 +442,41 @@ async function processDoc(idx){
         const total = pdf.numPages;
         const docId = String(item.id);
 
+        // Chất lượng: render theo CHIỀU RỘNG MỤC TIÊU cố định (px) thay vì scale cố định.
+        // Kiểu cũ (scale 2.2) cho ra ảnh chỉ ~1300px ngang với PDF khổ A4 -> màn hình Retina
+        // (devicePixelRatio 2) hiển thị khung ~900px CSS = 1800px thật -> phải phóng to ảnh lên
+        // -> chữ nhoè. Render thẳng 2560px thì trình duyệt chỉ việc THU NHỎ ảnh xuống, luôn nét.
+        const targetW = Math.max(1200, parseInt(document.getElementById('quality_' + idx).value, 10) || 3200);
+        let firstW = 0, firstH = 0;
+
         for (let p = 1; p <= total; p++){
             progTxt.textContent = `Đang tách & tải trang ${p}/${total}...`;
             progFill.style.width = Math.round((p / total) * 100) + '%';
 
             const page = await pdf.getPage(p);
-            // scale vừa đủ đọc rõ, không quá nặng dung lượng
-            const viewport = page.getViewport({ scale: 1.4 });
+            const base = page.getViewport({ scale: 1 });
+            // Tự tính scale sao cho ảnh ra đúng chiều rộng mục tiêu; chặn trần scale 8x
+            // để PDF khổ nhỏ (vd slide dọc) không tạo ảnh khổng lồ gây treo trình duyệt.
+            const scale = Math.min(8, targetW / base.width);
+            const viewport = page.getViewport({ scale });
             const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const ctx = canvas.getContext('2d');
+            canvas.width = Math.round(viewport.width);
+            canvas.height = Math.round(viewport.height);
+            const ctx = canvas.getContext('2d', { alpha: false });
+            // PDF nền trong suốt -> nếu không tô trắng trước, JPEG sẽ ra nền ĐEN.
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             await page.render({ canvasContext: ctx, viewport }).promise;
 
-            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.72));
+            if (p === 1){ firstW = canvas.width; firstH = canvas.height; }
+
+            // 0.97: gần như không còn thấy vết nén quanh chữ (0.95 thỉnh thoảng vẫn có quầng mờ
+            // rất nhẹ ở nét mảnh khi phóng to hết cỡ) — đánh đổi ảnh nặng hơn 1 chút.
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.97));
             await r2UploadPage(`${docId}/page-${p}.jpg`, blob);
+
+            // Giải phóng bộ nhớ canvas ngay (ảnh 3200px x 100 trang rất dễ làm tab bị "Aw, Snap")
+            canvas.width = canvas.height = 0;
         }
 
         progTxt.textContent = 'Đang lưu file PDF gốc (riêng tư)...';
@@ -279,10 +502,13 @@ async function processDoc(idx){
         item.free_pages = freePages;
         item.pages_total = total;
         item.pages_ready = true;
+        item.render_width = targetW;            // để admin biết lần tách này nét cỡ nào
+        item.page_w = firstW;                   // kích thước ảnh trang 1 -> viewer chừa đúng
+        item.page_h = firstH;                   // khung trước khi ảnh tải xong (không giật layout)
         await savePayload();
 
         progFill.style.width = '100%';
-        showMsg(idx, true, `✅ Xong! Đã tách ${total} trang, cho xem thử ${freePages} trang đầu.`);
+        showMsg(idx, true, `✅ Xong! Đã tách ${total} trang ở ${firstW}×${firstH}px, cho xem thử ${freePages} trang đầu.`);
         renderList();
     }catch(e){
         showMsg(idx, false, '❌ ' + (e.message || 'Có lỗi xảy ra.'));
@@ -297,12 +523,277 @@ async function togglePreview(idx, on){
     renderList();
 }
 
+// Chỉ lưu lại số trang xem thử — không cần chọn lại file / tách lại từ đầu.
+async function saveFreePages(idx){
+    const val = Math.max(0, parseInt(document.getElementById('freePages_' + idx).value, 10) || 0);
+    docList[idx].free_pages = val;
+    try{
+        await savePayload();
+        showMsg(idx, true, `✅ Đã lưu: cho xem thử ${val} trang đầu.`);
+    }catch(e){
+        showMsg(idx, false, '❌ Lỗi lưu: ' + e.message);
+    }
+}
+
 async function savePayload(){
     const { data } = await sb.from('site_settings').select('payload').eq('key', 'doc_content').single();
     const payload = (data && data.payload) || { free: [], paid: [] };
-    payload.paid = docList; // docList giữ nguyên tham chiếu object đã sửa ở trên
+    // Tách ngược về đúng định dạng cũ để trang chủ / chi-tiet.html đọc như bình thường
+    payload.free = docList.filter((it) => it.type === 'free').map((it) => {
+        const { type, access, ...rest } = it;
+        return Object.assign({}, rest, { price: 0 });
+    });
+    payload.paid = docList.filter((it) => it.type !== 'free').map((it) => {
+        const { type, ...rest } = it;
+        return Object.assign({}, rest, it.type === 'vip' ? { access: 'pro', price: 0 } : { access: 'buy' });
+    });
     const { error } = await sb.from('site_settings').update({ payload }).eq('key', 'doc_content');
     if (error) throw new Error('Lỗi lưu site_settings: ' + error.message);
+}
+
+// ---------- Upload/xoá file lên bucket public "tai-lieu" (dùng chung r2-storage, giống admin.js) ----------
+// Supabase JS chỉ trả error.message chung chung "Edge Function returned a non-2xx status code" —
+// lý do thật nằm trong body response lỗi (error.context). Đọc ra để hiện đúng nguyên nhân.
+async function r2ErrorDetail(error){
+    try{
+        if (error && error.context && typeof error.context.json === 'function'){
+            const body = await error.context.clone().json();
+            if (body && (body.error || body.message)) return body.error || body.message;
+        }
+    }catch(e){}
+    try{
+        if (error && error.context && typeof error.context.text === 'function'){
+            const text = await error.context.clone().text();
+            if (text) return text.slice(0, 300);
+        }
+    }catch(e){}
+    return (error && error.message) || 'Lỗi tải file lên.';
+}
+async function r2UploadDoc(bucket, path, file){
+    const { data, error } = await sb.functions.invoke('r2-storage', {
+        body: { action: 'get-upload-url', bucket, path, contentType: file.type || 'application/octet-stream' }
+    });
+    if (error) throw new Error(await r2ErrorDetail(error));
+    if (!data || !data.ok || !data.uploadUrl) throw new Error((data && data.error) || 'Lỗi tải file lên.');
+
+    const putRes = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+    });
+    if (!putRes.ok) throw new Error('Tải file lên R2 thất bại (mã lỗi ' + putRes.status + ').');
+
+    return data; // { ok:true, uploadUrl, publicUrl, path }
+}
+async function r2DeleteDoc(bucket, path){
+    if (!path) return;
+    try{ await sb.functions.invoke('r2-storage', { body: { action:'delete', bucket, path } }); }catch(e){ /* best-effort */ }
+}
+function fileNameFromUrl(url){
+    if (!url) return '';
+    try{
+        const clean = url.split('?')[0];
+        const last = decodeURIComponent(clean.split('/').pop() || '');
+        return last.replace(/^\d+-/, '');
+    }catch(e){ return url; }
+}
+function storagePathFromPublicUrl(url, bucket){
+    if (!url) return null;
+    const base = R2_PUBLIC_URLS[bucket];
+    if (!base || !url.startsWith(base + '/')) return null;
+    try{ return decodeURIComponent(url.slice(base.length + 1)); }catch(e){ return url.slice(base.length + 1); }
+}
+
+// ---------- Chọn loại tài liệu trong form ----------
+let dfType = 'vip';
+function pickDfType(type){
+    dfType = type;
+    document.querySelectorAll('#dfTypeToggle .type-opt').forEach((el) => {
+        el.classList.toggle('selected', el.dataset.type === type);
+    });
+    const priceEl = document.getElementById('dfPrice');
+    const hintEl = document.getElementById('dfPriceHint');
+    if (type === 'paid'){
+        priceEl.disabled = false;
+        if (Number(priceEl.value) === 0) priceEl.value = '';
+        hintEl.textContent = 'Bắt buộc > 0. Khách thanh toán qua SePay mới tải được file gốc.';
+    } else {
+        priceEl.value = 0;
+        priceEl.disabled = true;
+        hintEl.textContent = type === 'free'
+            ? 'Tài liệu miễn phí — giá 0đ, khách tải/đọc trực tiếp.'
+            : 'Không bán lẻ — khách phải đang có gói Pro (VIP) mới xem full.';
+    }
+}
+
+// ---------- Mở/đóng form thêm/sửa ----------
+function openDocForm(idx){
+    docFormEditIdx = (idx === undefined) ? null : idx;
+    const item = (docFormEditIdx != null) ? docList[docFormEditIdx] : null;
+
+    document.getElementById('docFormTitle').textContent = item ? 'Sửa tài liệu' : 'Thêm tài liệu mới';
+    document.getElementById('dfTitle').value = item ? (item.title || '') : '';
+    document.getElementById('dfDesc').value = item ? (item.desc || '') : '';
+    pickDfType(item ? (item.type || 'vip') : 'vip');
+    document.getElementById('dfPrice').value = item ? (item.price || 0) : 0;
+    document.getElementById('dfLink').value = item ? (item.link || '') : '';
+    document.getElementById('dfFile').value = '';
+    document.getElementById('dfFileName').textContent = item && item.link ? ('📄 ' + fileNameFromUrl(item.link) + ' (đang dùng)') : '';
+    document.getElementById('dfImage').value = '';
+    document.getElementById('dfImageUrl').value = item ? (item.image || '') : '';
+    document.getElementById('dfImageName').textContent = item && item.image ? ('🖼️ ' + fileNameFromUrl(item.image) + ' (đang dùng)') : '';
+    const thumb = document.getElementById('dfImageThumb');
+    if (item && item.image){ thumb.src = item.image; thumb.style.display = ''; } else { thumb.style.display = 'none'; }
+    document.getElementById('dfImageRemoveBtn').style.display = (item && item.image) ? '' : 'none';
+    document.getElementById('dfVisible').checked = !(item && item.hidden);
+    const msgEl = document.getElementById('dfMsg'); msgEl.style.display = 'none'; msgEl.textContent = '';
+
+    document.getElementById('docFormOverlay').classList.add('show');
+}
+function closeDocForm(){
+    document.getElementById('docFormOverlay').classList.remove('show');
+    docFormEditIdx = null;
+}
+function showDfMsg(ok, text){
+    const el = document.getElementById('dfMsg');
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+    el.textContent = text;
+    el.style.display = 'block';
+}
+
+async function onDocFileSelected(){
+    const fileInput = document.getElementById('dfFile');
+    const file = fileInput.files[0];
+    if (!file) return;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!DOC_ALLOWED_EXT.includes(ext)){ showDfMsg(false, 'Chỉ hỗ trợ file PDF hoặc Word (.pdf, .doc, .docx).'); fileInput.value = ''; return; }
+    if (file.size > DOC_MAX_SIZE){ showDfMsg(false, 'File quá lớn (tối đa 100MB).'); fileInput.value = ''; return; }
+
+    const nameEl = document.getElementById('dfFileName');
+    nameEl.textContent = '⏳ Đang tải lên...';
+    const oldLink = document.getElementById('dfLink').value;
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = 'doc/' + Date.now() + '-' + safeName;
+
+    try{
+        const res = await r2UploadDoc(DOC_BUCKET, path, file);
+        document.getElementById('dfLink').value = res.publicUrl;
+        nameEl.textContent = '📄 ' + file.name;
+        showDfMsg(true, '✔ Đã tải file lên. Bấm "Lưu" để hoàn tất.');
+        if (oldLink){ const oldPath = storagePathFromPublicUrl(oldLink, DOC_BUCKET); if (oldPath) r2DeleteDoc(DOC_BUCKET, oldPath); }
+    }catch(e){
+        nameEl.textContent = '';
+        showDfMsg(false, 'Lỗi tải file lên: ' + e.message);
+        fileInput.value = '';
+    }
+}
+async function onDocImageSelected(){
+    const imgInput = document.getElementById('dfImage');
+    const file = imgInput.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')){ showDfMsg(false, 'Vui lòng chọn một file ảnh.'); imgInput.value = ''; return; }
+    if (file.size > DOC_IMAGE_MAX_SIZE){ showDfMsg(false, 'Ảnh quá lớn (tối đa 5MB).'); imgInput.value = ''; return; }
+
+    const nameEl = document.getElementById('dfImageName');
+    nameEl.textContent = '⏳ Đang tải lên...';
+    const oldImage = document.getElementById('dfImageUrl').value;
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = 'doc-covers/' + Date.now() + '-' + safeName;
+
+    try{
+        const res = await r2UploadDoc(DOC_BUCKET, path, file);
+        document.getElementById('dfImageUrl').value = res.publicUrl;
+        nameEl.textContent = '🖼️ ' + file.name;
+        const thumb = document.getElementById('dfImageThumb');
+        thumb.src = res.publicUrl; thumb.style.display = '';
+        document.getElementById('dfImageRemoveBtn').style.display = '';
+        if (oldImage){ const oldPath = storagePathFromPublicUrl(oldImage, DOC_BUCKET); if (oldPath) r2DeleteDoc(DOC_BUCKET, oldPath); }
+    }catch(e){
+        nameEl.textContent = '';
+        showDfMsg(false, 'Lỗi tải ảnh lên: ' + e.message);
+        imgInput.value = '';
+    }
+}
+function removeDocImage(){
+    const oldImage = document.getElementById('dfImageUrl').value;
+    document.getElementById('dfImageUrl').value = '';
+    document.getElementById('dfImage').value = '';
+    document.getElementById('dfImageName').textContent = '';
+    document.getElementById('dfImageThumb').style.display = 'none';
+    document.getElementById('dfImageRemoveBtn').style.display = 'none';
+    if (oldImage){ const oldPath = storagePathFromPublicUrl(oldImage, DOC_BUCKET); if (oldPath) r2DeleteDoc(DOC_BUCKET, oldPath); }
+}
+
+async function saveDocForm(){
+    const title = document.getElementById('dfTitle').value.trim();
+    const desc = document.getElementById('dfDesc').value.trim();
+    const price = Number(document.getElementById('dfPrice').value);
+    const link = document.getElementById('dfLink').value.trim();
+    const image = document.getElementById('dfImageUrl').value.trim();
+    const hidden = !document.getElementById('dfVisible').checked;
+
+    if (!title) return showDfMsg(false, 'Nhập tiêu đề.');
+    if (dfType === 'paid' && (!price || price <= 0)) return showDfMsg(false, 'Tài liệu trả phí cần giá bán lớn hơn 0.');
+    if (!link) return showDfMsg(false, 'Chọn file tài liệu (PDF hoặc Word) trước.');
+
+    const btn = document.getElementById('dfSaveBtn');
+    btn.disabled = true;
+    try{
+        const finalPrice = dfType === 'paid' ? price : 0;
+        if (docFormEditIdx != null){
+            const item = docList[docFormEditIdx];
+            item.title = title; item.desc = desc; item.price = finalPrice; item.link = link;
+            item.image = image; item.hidden = hidden; item.type = dfType;
+        } else {
+            docList.push({
+                id: 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+                icon: 'fa-solid fa-file-lines', color: 'green',
+                title, desc, price: finalPrice, link, image, hidden, type: dfType
+            });
+        }
+        await savePayload();
+        showMsg2(true, (docFormEditIdx != null ? 'Đã cập nhật' : 'Đã thêm') + ' tài liệu "' + title + '".');
+        closeDocForm();
+        renderList();
+    }catch(e){
+        showDfMsg(false, 'Lỗi lưu: ' + e.message);
+    }finally{
+        btn.disabled = false;
+    }
+}
+
+async function deleteDoc(idx){
+    const item = docList[idx];
+    if (!item) return;
+    if (!confirm(`Xoá tài liệu "${item.title || ''}"? Khách đã mua vẫn không mất quyền lợi cũ, nhưng tài liệu sẽ biến mất khỏi trang chủ ngay. Không thể hoàn tác.`)) return;
+
+    if (item.link){ const p = storagePathFromPublicUrl(item.link, DOC_BUCKET); if (p) r2DeleteDoc(DOC_BUCKET, p); }
+    if (item.image){ const p = storagePathFromPublicUrl(item.image, DOC_BUCKET); if (p) r2DeleteDoc(DOC_BUCKET, p); }
+    if (item.pages_ready){
+        try{ await sb.from('document_sources').delete().eq('doc_id', String(item.id)); }catch(e){}
+    }
+    docList.splice(idx, 1);
+    try{
+        await savePayload();
+        showMsg2(true, 'Đã xoá tài liệu.');
+        renderList();
+    }catch(e){
+        showMsg2(false, 'Lỗi xoá: ' + e.message);
+    }
+}
+// Thông báo nổi ngắn ở đầu danh sách (không gắn với 1 thẻ cụ thể, khác showMsg(idx,...) đã có)
+function showMsg2(ok, text){
+    let el = document.getElementById('topMsg');
+    if (!el){
+        el = document.createElement('div');
+        el.id = 'topMsg';
+        el.style.marginBottom = '14px';
+        document.getElementById('list').before(el);
+    }
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+    el.style.display = 'block';
+    el.textContent = text;
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 4000);
 }
 
 boot();

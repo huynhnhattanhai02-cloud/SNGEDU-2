@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="frontend/maintenance-check.js"></script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14151c" media="(prefers-color-scheme: dark)">
 <meta name="robots" content="noindex, nofollow">
@@ -24,87 +24,299 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
     :root{
-        --bg:#f5f7fb; --card:#ffffff; --line:#e8eaf1; --ink:#1f2433; --ink-soft:#6b7180; --ink-mute:#9aa0b1;
-        --green:#17b26a; --green-bg:#e7f9f0; --amber:#f5a524; --amber-bg:#fef3e0;
-        --brand:#4f6bff; --brand-bg:#eef1ff;
-        --shadow:0 1px 2px rgba(20,22,40,.04), 0 8px 24px -12px rgba(20,22,40,.08);
+        --bg:#eceff6; --card:#ffffff; --line:#e2e6ef; --ink:#1f2433; --ink-soft:#6b7180; --ink-mute:#9aa0b1;
+        --green:#17b26a; --brand:#4f6bff;
+        --page-shadow:0 2px 6px rgba(20,22,40,.09), 0 18px 40px -22px rgba(20,22,40,.35);
+        --shadow:0 1px 2px rgba(20,22,40,.04), 0 8px 24px -12px rgba(20,22,40,.10);
+        --skeleton:linear-gradient(100deg,#eef0f6 30%,#f7f8fc 50%,#eef0f6 70%);
     }
     html[data-theme="dark"]{
-        --bg:#14151c; --card:#1c1e28; --line:#2c2f3c; --ink:#f0f1f6; --ink-soft:#a2a7ba; --ink-mute:#6f7488;
-        --green:#2ed392; --green-bg:#163a2c; --amber:#ffbd4a; --amber-bg:#3a2f16;
-        --brand:#6d84ff; --brand-bg:#1c2340;
+        --bg:#101118; --card:#1c1e28; --line:#2c2f3c; --ink:#f0f1f6; --ink-soft:#a2a7ba; --ink-mute:#6f7488;
+        --green:#2ed392; --brand:#6d84ff;
+        --page-shadow:0 2px 6px rgba(0,0,0,.45), 0 18px 44px -22px rgba(0,0,0,.9);
         --shadow:0 1px 2px rgba(0,0,0,.2), 0 8px 24px -12px rgba(0,0,0,.5);
+        --skeleton:linear-gradient(100deg,#20222d 30%,#272a37 50%,#20222d 70%);
     }
     *{ box-sizing:border-box; }
     html, body{
         margin:0; background:var(--bg); color:var(--ink); font-family:'Be Vietnam Pro',sans-serif;
         /* Chặn bôi đen/copy chữ + long-press lưu ảnh trên mobile — chỉ là rào cản, không tuyệt đối */
         -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+        padding-top:env(safe-area-inset-top, 0px);
     }
+
+    /* ---------- Thanh công cụ ---------- */
     .topbar{
-        position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px;
-        padding:12px 16px; background:var(--card); border-bottom:1px solid var(--line);
+        position:sticky; top:env(safe-area-inset-top, 0px); z-index:30;
+        display:flex; align-items:center; gap:10px; padding:10px 14px;
+        background:var(--card); border-bottom:1px solid var(--line);
     }
-    .topbar .back{ width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); text-decoration:none; border:1px solid var(--line); flex-shrink:0; }
-    .topbar .title{ font-weight:700; font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
-    .topbar .pages-count{ font-size:.78rem; color:var(--ink-mute); flex-shrink:0; }
+    .tb-btn{
+        width:36px; height:36px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center;
+        color:var(--ink-soft); text-decoration:none; border:1px solid var(--line); background:var(--card);
+        flex-shrink:0; cursor:pointer; font-size:.85rem; font-family:inherit;
+    }
+    .tb-btn:hover{ color:var(--brand); border-color:var(--brand); }
+    .topbar .title{ font-weight:700; font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .zoom-group{ display:flex; align-items:center; gap:4px; }
+    .zoom-val{ font-size:.75rem; color:var(--ink-mute); min-width:42px; text-align:center; font-variant-numeric:tabular-nums; }
+    .btn-pro{
+        display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:10px;
+        background:linear-gradient(135deg,#f5a524,#f97316); color:#fff; font-weight:700; font-size:.8rem;
+        text-decoration:none; white-space:nowrap; flex-shrink:0;
+    }
+    .btn-report{
+        display:inline-flex; align-items:center; gap:7px; padding:9px 12px; border-radius:10px;
+        border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+        font-weight:600; font-size:.8rem; font-family:inherit; text-decoration:none; white-space:nowrap; flex-shrink:0; cursor:pointer;
+    }
+    .btn-report:hover{ color:#dc2626; border-color:#dc2626; }
+    @media (max-width:680px){
+        .zoom-val{ display:none; }
+        .btn-pro span.lbl{ display:none; }
+        .btn-pro{ padding:9px 12px; }
+        .btn-report span.lbl{ display:none; }
+    }
 
-    .wrap{ max-width:820px; margin:0 auto; padding:18px 14px 80px; }
-
+    /* ---------- Vùng trang ---------- */
+    /* display:flex + align-items:center để canh giữa trang: cách này cuộn ngang được đầy đủ cả
+       2 bên khi trang rộng hơn khung nhìn (margin:0 auto kiểu cũ bị lỗi kẹt, không cuộn được
+       hết sang trái khi nội dung tràn ra ngoài). */
+    /* touch-action:none ở đây để trình duyệt (đặc biệt Safari/iOS) không tự ý phóng to bằng
+       cử chỉ chụm 2 ngón (pinch) của HỆ ĐIỀU HÀNH song song với zoom riêng của app (initPinchZoom
+       bên dưới) — 2 cơ chế zoom cùng lúc làm toạ độ chạm bị lệch, khiến các thao tác chạm chính
+       xác như TẨY hoạt động chập chờn hoặc "chết" hẳn sau khi phóng to/thu nhỏ, phải tải lại
+       trang mới hết. Việc phóng to/thu nhỏ trong app đã có nút +/- và pinch riêng (initPinchZoom)
+       nên tắt pinch gốc của trình duyệt không mất chức năng gì. */
+    .wrap{ padding:18px 12px 96px; overflow-x:auto; display:flex; flex-direction:column; align-items:center; touch-action:pan-x pan-y; }
     .page-slot{
-        position:relative; margin:0 auto 14px; background:var(--card); border:1px solid var(--line);
-        border-radius:10px; overflow:hidden; box-shadow:var(--shadow); min-height:320px;
-        display:flex; align-items:center; justify-content:center;
+        position:relative; width:min(100%, var(--page-width, 900px)); margin:0 0 18px; flex-shrink:0;
+        background:var(--card); border-radius:6px; overflow:hidden; box-shadow:var(--page-shadow);
     }
+    /* Khi đang PHÓNG TO (>100%): bỏ giới hạn "không quá 100% khung nhìn" để trang thật sự to
+       ra theo đúng mức zoom đã chọn, dù rộng hơn cả cửa sổ trình duyệt -> cuộn ngang để xem hết. */
+    .wrap.zoomed-in .page-slot{ width:var(--page-width, 900px); }
+    .page-slot .ph{
+        position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+        color:var(--ink-mute); font-size:.82rem; gap:8px; flex-direction:column;
+        background:var(--skeleton); background-size:200% 100%; animation:sk 1.4s linear infinite;
+    }
+    @keyframes sk{ 0%{ background-position:160% 0; } 100%{ background-position:-60% 0; } }
     .page-img{
-        width:100%; aspect-ratio:auto; background-size:contain; background-position:center; background-repeat:no-repeat;
-        min-height:320px; pointer-events:none; /* ảnh nền -> right click không ra menu "Lưu ảnh" */
+        display:block; width:100%; height:auto;
+        /* ảnh gốc luôn rộng hơn khung -> trình duyệt chỉ việc THU NHỎ, chữ giữ nguyên độ nét */
+        pointer-events:none; -webkit-user-drag:none;
     }
-    .page-loading{ color:var(--ink-mute); font-size:.85rem; display:flex; flex-direction:column; align-items:center; gap:8px; }
-    .page-num{ position:absolute; bottom:8px; right:12px; font-size:.72rem; color:#fff; background:rgba(0,0,0,.45); padding:2px 8px; border-radius:999px; pointer-events:none; }
+    .page-num{
+        position:absolute; bottom:8px; right:10px; font-size:.7rem; color:#fff; background:rgba(0,0,0,.42);
+        padding:2px 9px; border-radius:999px; pointer-events:none; font-variant-numeric:tabular-nums;
+    }
 
-    /* watermark phủ lên mỗi trang — không chặn được chụp màn hình, nhưng giúp truy vết nếu bị phát tán */
+    /* Dấu truy vết: chỉ 1 dòng chữ nhỏ ở góc dưới bên trái mỗi trang (không còn chữ chéo phủ cả trang).
+       Vẫn ghi email người xem để nếu tài liệu bị phát tán thì tra được ai đã xem. */
     .watermark{
-        position:absolute; inset:0; pointer-events:none; overflow:hidden; opacity:.16;
-        display:flex; flex-wrap:wrap; align-content:space-around; justify-content:space-around;
-        transform:rotate(-24deg) scale(1.3); font-size:.78rem; font-weight:700; color:#000;
+        position:absolute; left:12px; bottom:9px; max-width:calc(100% - 80px); z-index:2;
+        font-size:.68rem; font-weight:500; letter-spacing:.01em; line-height:1.2;
+        color:rgba(0,0,0,.55); text-shadow:0 0 3px rgba(255,255,255,.9);
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; pointer-events:none;
     }
-    html[data-theme="dark"] .watermark{ color:#fff; }
-    .watermark span{ white-space:nowrap; margin:14px 22px; }
 
+    /* ---------- Khối khoá / trạng thái ---------- */
     .lock-card{
-        background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
-        padding:34px 22px; text-align:center; margin-top:6px;
+        width:min(100%, var(--page-width, 900px)); margin:6px auto 0;
+        background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+        padding:38px 22px; text-align:center;
     }
-    .lock-card i.fa-lock{ font-size:2.1rem; color:var(--brand); margin-bottom:14px; }
-    .lock-card h3{ margin:0 0 6px; font-size:1.05rem; }
-    .lock-card p{ margin:0 0 18px; color:var(--ink-soft); font-size:.88rem; line-height:1.6; }
+    .lock-card .crown{
+        width:56px; height:56px; border-radius:16px; margin:0 auto 14px; display:flex; align-items:center; justify-content:center;
+        background:linear-gradient(135deg,#f5a524,#f97316); color:#fff; font-size:1.5rem;
+    }
+    .lock-card h3{ margin:0 0 8px; font-size:1.12rem; }
+    .lock-card p{ margin:0 auto 20px; color:var(--ink-soft); font-size:.9rem; line-height:1.65; max-width:440px; }
+    .perks{ max-width:330px; margin:0 auto 22px; }
+    .perk{ display:flex; gap:9px; align-items:flex-start; text-align:left; font-size:.86rem; color:var(--ink-soft); margin-bottom:8px; }
+    .perk i{ color:var(--green); margin-top:3px; }
     .lock-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
-    .btn{ padding:11px 20px; border-radius:10px; border:none; font-weight:700; font-size:.87rem; cursor:pointer; font-family:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary{ background:var(--brand); color:#fff; }
+    .btn{ padding:12px 22px; border-radius:11px; border:none; font-weight:700; font-size:.88rem; cursor:pointer; font-family:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+    .btn-primary{ background:linear-gradient(135deg,#f5a524,#f97316); color:#fff; }
     .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--ink); }
 
     .state{ text-align:center; padding:80px 20px; color:var(--ink-mute); }
     .state i{ font-size:2rem; margin-bottom:12px; display:block; }
 
-    .blur-teaser{ filter:blur(6px) brightness(.9); }
+    /* ---------- Thanh số trang nổi ---------- */
+    .pager{
+        position:fixed; left:50%; transform:translateX(-50%);
+        bottom:calc(18px + env(safe-area-inset-bottom, 0px)); z-index:25;
+        display:flex; align-items:center; gap:8px; padding:8px 10px 8px 14px; border-radius:999px;
+        background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow);
+        font-size:.8rem; color:var(--ink-soft); font-variant-numeric:tabular-nums;
+        opacity:0; pointer-events:none; transition:opacity .25s ease;
+    }
+    .pager.show{ opacity:1; pointer-events:auto; }
+    .pager input{
+        width:56px; padding:5px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg);
+        color:var(--ink); font-family:inherit; font-size:.8rem; text-align:center;
+    }
+    .pager .go{ border:none; background:var(--brand); color:#fff; border-radius:8px; padding:6px 11px; font-weight:700; cursor:pointer; font-family:inherit; font-size:.78rem; }
+
+    /* ---------- Lớp ghi chú trên trang (highlight / bút / ghim note) ---------- */
+    /* Cục tẩy vẽ tay (SVG) làm con trỏ chuột: xoay 45°, phần hồng là cao su, phần trắng là viền
+       gôm — encode base64 để không phải lo escape ký tự trong data URI. Toạ độ hotspot 13,22 rơi
+       đúng vào mép dưới-trái của khối, chỗ người dùng cảm nhận là "đầu tẩy" khi rê qua nét vẽ. */
+    .annot-layer{ position:absolute; inset:0; z-index:3; touch-action:pan-y; }
+    .annot-layer.drawable{ touch-action:none; cursor:crosshair; }
+    .annot-layer.erase-mode{
+        touch-action:none;
+        cursor:url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdmlld0JveD0iMCAwIDI2IDI2Ij48ZyB0cmFuc2Zvcm09InJvdGF0ZSg0NSAxMyAxMykiPjxyZWN0IHg9IjQiIHk9IjkiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxMSIgcng9IjIuNSIgZmlsbD0iI2ZmY2RkOCIgc3Ryb2tlPSIjMjIyODMxIiBzdHJva2Utd2lkdGg9IjEuNiIvPjxyZWN0IHg9IjQiIHk9IjkiIHdpZHRoPSIxOCIgaGVpZ2h0PSI0LjUiIHJ4PSIyLjUiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzIyMjgzMSIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48L2c+PC9zdmc+') 13 22, cell;
+    }
+    .annot-layer.erase-mode path{ cursor:inherit; }
+    .annot-layer path{ pointer-events:stroke; }
+    body.eraser-active .note-pin{ cursor:url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdmlld0JveD0iMCAwIDI2IDI2Ij48ZyB0cmFuc2Zvcm09InJvdGF0ZSg0NSAxMyAxMykiPjxyZWN0IHg9IjQiIHk9IjkiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxMSIgcng9IjIuNSIgZmlsbD0iI2ZmY2RkOCIgc3Ryb2tlPSIjMjIyODMxIiBzdHJva2Utd2lkdGg9IjEuNiIvPjxyZWN0IHg9IjQiIHk9IjkiIHdpZHRoPSIxOCIgaGVpZ2h0PSI0LjUiIHJ4PSIyLjUiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzIyMjgzMSIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48L2c+PC9zdmc+') 13 22, cell; }
+    .note-pin{
+        position:absolute; width:24px; height:24px; margin:-22px 0 0 -12px; border-radius:50% 50% 50% 4px;
+        display:flex; align-items:center; justify-content:center; color:#fff; font-size:.68rem; font-weight:800;
+        box-shadow:0 2px 6px rgba(0,0,0,.35); cursor:pointer; z-index:4; transform:rotate(-45deg);
+        border:2px solid #fff;
+    }
+    .note-pin i, .note-pin span{ transform:rotate(45deg); }
+
+    /* ---------- Thanh công cụ ghi chú nổi (góc phải dưới) ---------- */
+    .annot-fab{
+        position:fixed; right:calc(16px + env(safe-area-inset-right, 0px)); bottom:calc(88px + env(safe-area-inset-bottom, 0px));
+        z-index:40; width:58px; height:58px; border-radius:50%; border:2px solid rgba(255,255,255,.65); cursor:pointer;
+        background:linear-gradient(135deg,#4f6bff,#6d84ff); color:#fff; font-size:1.4rem;
+        display:flex; align-items:center; justify-content:center; box-shadow:0 10px 26px -6px rgba(79,107,255,.65), 0 0 0 4px rgba(79,107,255,.14);
+        transition:transform .2s ease;
+    }
+    .annot-fab.active{ background:linear-gradient(135deg,#f5a524,#f97316); box-shadow:0 10px 26px -6px rgba(249,115,22,.65), 0 0 0 4px rgba(249,115,22,.16); }
+    .annot-fab:active{ transform:scale(.92); }
+    .annot-panel{
+        position:fixed; right:calc(16px + env(safe-area-inset-right, 0px)); bottom:calc(156px + env(safe-area-inset-bottom, 0px));
+        z-index:40; background:var(--card); border:2px solid var(--brand); border-radius:20px;
+        box-shadow:0 16px 40px -10px rgba(20,22,40,.35), 0 0 0 4px rgba(79,107,255,.10);
+        padding:14px; display:none; flex-direction:column; gap:11px; width:252px;
+    }
+    .annot-panel.show{ display:flex; }
+    .annot-tools{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    .annot-tool{
+        width:100%; aspect-ratio:1; border-radius:12px; border:1px solid var(--line); background:var(--bg);
+        color:var(--ink-soft); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer;
+        transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .annot-tool.on{ background:var(--brand); color:#fff; border-color:var(--brand); box-shadow:0 4px 12px -2px rgba(79,107,255,.55); transform:translateY(-1px); }
+    .annot-colors{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; }
+    .annot-color{
+        width:30px; height:30px; border-radius:50%; border:2px solid var(--line); cursor:pointer; padding:0;
+    }
+    .annot-color.on{ border-color:var(--ink); box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--ink); transform:scale(1.08); }
+    .annot-size-row{ display:none; align-items:center; gap:10px; padding:2px 2px 0; }
+    .annot-size-row.show{ display:flex; }
+    .annot-size-bar{
+        position:relative; flex:1; height:40px; border-radius:13px; background:var(--bg);
+        border:1px solid var(--line); cursor:pointer; touch-action:none; overflow:hidden;
+    }
+    .annot-size-bar-shape{
+        position:absolute; left:16px; right:16px; top:9px; bottom:9px; width:auto; height:auto;
+        color:var(--ink-mute); pointer-events:none;
+    }
+    .annot-size-bar-shape path{ fill:currentColor; }
+    .annot-size-thumb{
+        position:absolute; top:50%; left:0; width:28px; height:28px; border-radius:50%; background:var(--brand);
+        border:3px solid var(--card); box-shadow:0 2px 8px rgba(0,0,0,.4); transform:translate(-50%,-50%);
+        pointer-events:none; transition:background .12s ease;
+    }
+    .annot-size-label{ font-size:.72rem; color:var(--ink-mute); width:44px; text-align:right; flex-shrink:0; }
+    .annot-mode-row{ display:none; gap:6px; background:var(--bg); border-radius:10px; padding:4px; }
+    .annot-mode-btn{
+        flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 4px; border-radius:8px;
+        border:none; background:transparent; color:var(--ink-soft); font-size:.76rem; font-weight:700;
+        cursor:pointer; font-family:inherit;
+    }
+    .annot-mode-btn.on{ background:var(--card); color:var(--brand); box-shadow:0 2px 6px -1px rgba(20,22,40,.18); }
+    .annot-panel-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .annot-mini-btn{
+        flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 6px; border-radius:10px;
+        border:1px solid var(--line); background:var(--bg); color:var(--ink-soft); font-size:.82rem; font-weight:700;
+        cursor:pointer; font-family:inherit;
+    }
+    .annot-mini-btn:hover{ color:var(--brand); border-color:var(--brand); }
+    .annot-hint{ font-size:.76rem; color:var(--ink-mute); text-align:center; line-height:1.45; font-weight:500; }
+    .note-editor{
+        z-index:60; width:210px; background:var(--card); border:1px solid var(--line);
+        border-radius:12px; box-shadow:var(--shadow); padding:10px;
+    }
+    .note-editor textarea{
+        width:100%; min-height:64px; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:7px 9px;
+        background:var(--bg); color:var(--ink); font-family:inherit; font-size:.82rem;
+    }
+    .note-editor .row{ display:flex; gap:6px; margin-top:7px; }
+    .note-editor button{
+        flex:1; border:none; border-radius:7px; padding:7px 6px; font-size:.74rem; font-weight:700; cursor:pointer; font-family:inherit;
+    }
+    .note-editor .save{ background:var(--brand); color:#fff; }
+    .note-editor .del{ background:var(--red-bg,#fde8e8); color:#dc2626; }
 </style>
 </head>
 <body oncontextmenu="return false">
 
 <div class="topbar">
-    <a href="javascript:history.back()" class="back"><i class="fa-solid fa-arrow-left"></i></a>
+    <a href="javascript:history.back()" class="tb-btn" title="Quay lại"><i class="fa-solid fa-arrow-left"></i></a>
     <div class="title" id="docTitle">Đang tải...</div>
-    <div class="pages-count" id="pagesCount"></div>
+    <div class="zoom-group">
+        <button class="tb-btn" onclick="zoomStep(-1)" title="Thu nhỏ"><i class="fa-solid fa-minus"></i></button>
+        <span class="zoom-val" id="zoomVal">100%</span>
+        <button class="tb-btn" onclick="zoomStep(1)" title="Phóng to"><i class="fa-solid fa-plus"></i></button>
+        <button class="tb-btn" onclick="zoomReset()" title="Vừa khung đọc"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>
+    </div>
+    <a class="btn-report" id="reportBtn" href="#" onclick="return openReport()" title="Báo lỗi tài liệu / trang này"><i class="fa-solid fa-flag"></i> <span class="lbl">Báo lỗi</span></a>
+    <a class="btn-pro" id="proBtn" href="index.html?openPro=1#doc" style="display:none;"><i class="fa-solid fa-crown"></i> <span class="lbl">Nâng cấp Pro</span></a>
 </div>
 
 <div class="wrap" id="wrap">
     <div class="state"><i class="fa-solid fa-spinner fa-spin"></i>Đang tải tài liệu...</div>
 </div>
 
+<div class="pager" id="pager">
+    <span id="pagerLabel">1 / 1</span>
+    <input type="number" id="pagerInput" min="1" placeholder="Trang" onkeydown="if(event.key==='Enter') jumpToPage()">
+    <button class="go" onclick="jumpToPage()">Đi</button>
+</div>
+
+<!-- Ghi chú cá nhân: tô đậm / viết chú thích / ghim note ngay trên trang, lưu riêng trên máy người đọc -->
+<button class="annot-fab" id="annotFab" title="Công cụ ghi chú" onclick="toggleAnnotPanel()"><i class="fa-solid fa-pen-nib"></i></button>
+<div class="annot-panel" id="annotPanel">
+    <div class="annot-tools">
+        <button class="annot-tool" id="toolCursor" title="Cuộn trang" onclick="setTool('none')"><i class="fa-solid fa-hand"></i></button>
+        <button class="annot-tool" id="toolHighlight" title="Tô đậm" onclick="setTool('highlight')"><i class="fa-solid fa-highlighter"></i></button>
+        <button class="annot-tool" id="toolPen" title="Viết / khoanh vùng" onclick="setTool('pen')"><i class="fa-solid fa-pen"></i></button>
+        <button class="annot-tool" id="toolNote" title="Ghim chú thích" onclick="setTool('note')"><i class="fa-solid fa-note-sticky"></i></button>
+        <button class="annot-tool" id="toolEraser" title="Xoá ghi chú" onclick="setTool('eraser')"><i class="fa-solid fa-eraser"></i></button>
+    </div>
+    <div class="annot-colors" id="annotColors"></div>
+    <div class="annot-size-row" id="annotSizeRow">
+        <div class="annot-size-bar" id="annotSizeBar">
+            <svg class="annot-size-bar-shape" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <path d="M0,13 L100,3 L100,21 Z"></path>
+            </svg>
+            <div class="annot-size-thumb" id="annotSizeThumb"></div>
+        </div>
+        <span class="annot-size-label" id="annotSizeLabel">Vừa</span>
+    </div>
+    <div class="annot-mode-row" id="annotModeRow">
+        <button class="annot-mode-btn" id="modeFree" title="Vẽ tự do theo tay" onclick="setAnnotMode(false)"><i class="fa-solid fa-signature"></i> Tự do</button>
+        <button class="annot-mode-btn" id="modeStraight" title="Vẽ đường thẳng" onclick="setAnnotMode(true)"><i class="fa-solid fa-ruler"></i> Thẳng</button>
+    </div>
+    <div class="annot-panel-row">
+        <button class="annot-mini-btn" onclick="undoAnnot()"><i class="fa-solid fa-rotate-left"></i> Hoàn tác</button>
+        <button class="annot-mini-btn" onclick="clearPageAnnot()"><i class="fa-solid fa-trash"></i> Xoá trang</button>
+    </div>
+    <div class="annot-hint" id="annotHint">Chọn công cụ rồi tô/viết trực tiếp lên trang. Ghi chú chỉ lưu trên máy này.</div>
+</div>
+
 <script>
-const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const DOC_PAGES_FN_URL = SUPABASE_URL + '/functions/v1/doc-pages';
 
@@ -115,6 +327,13 @@ let currentSession = null;
 let currentItem = null;
 let isPaidDoc = false;
 let watermarkLabel = 'SNG EDU';
+let pagesTotal = 0;
+let currentPage = 1;
+
+// Zoom: 100% = khung đọc 900px (hoặc full bề ngang màn hình nếu nhỏ hơn).
+// Ảnh trang được admin render sẵn ở 2560px nên kéo tới 220% vẫn còn nét.
+const ZOOM_STEPS = [70, 85, 100, 125, 150, 180, 220, 260, 300, 350];
+let zoomIdx = 2;
 
 function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -132,18 +351,523 @@ function showState(html){
 }
 
 function watermarkHtml(){
-    const parts = [];
-    for (let i = 0; i < 10; i++) parts.push(`<span>${escapeHtml(watermarkLabel)}</span>`);
-    return `<div class="watermark">${parts.join('')}</div>`;
+    // 1 dòng nhỏ ở góc dưới bên trái mỗi trang
+    return `<div class="watermark">${escapeHtml(watermarkLabel)}</div>`;
 }
 
+// ---------- Zoom ----------
+function applyZoom(){
+    const pct = ZOOM_STEPS[zoomIdx];
+    document.documentElement.style.setProperty('--page-width', Math.round(900 * pct / 100) + 'px');
+    document.getElementById('zoomVal').textContent = pct + '%';
+    document.getElementById('wrap').classList.toggle('zoomed-in', pct > 100);
+    try{ localStorage.setItem('sng-doc-zoom', String(zoomIdx)); }catch(e){}
+}
+function zoomStep(dir){
+    zoomIdx = Math.max(0, Math.min(ZOOM_STEPS.length - 1, zoomIdx + dir));
+    applyZoom();
+}
+function zoomReset(){ zoomIdx = 2; applyZoom(); }
+
+// Cuộn giữa trang bằng Ctrl/Cmd + lăn chuột, giống Ctrl +/- trên bàn phím (desktop)
+document.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    zoomStep(e.deltaY < 0 ? 1 : -1);
+}, { passive:false });
+
+// Chặn cử chỉ zoom gốc của Safari/iOS (sự kiện gesturestart/gesturechange, KHÁC với touch
+// event) — bản thân touchmove.preventDefault() phía dưới không chặn được cử chỉ này trên một
+// số phiên bản Safari, khiến trang bị trình duyệt tự phóng to song song với zoom riêng của app,
+// gây lệch toạ độ chạm và các thao tác như tẩy bị chập chờn/mất tác dụng sau khi zoom.
+['gesturestart', 'gesturechange', 'gestureend'].forEach((evt) => {
+    document.addEventListener(evt, (e) => e.preventDefault());
+});
+
+// Pinch-zoom 2 ngón trên di động: gộp khoảng cách 2 ngón thành các bước zoom có sẵn
+(function initPinchZoom(){
+    let startDist = 0, startIdx = 2, pinching = false;
+    function dist(t){ return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+    document.getElementById('wrap').addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2){ pinching = true; startDist = dist(e.touches); startIdx = zoomIdx; }
+    }, { passive:true });
+    document.getElementById('wrap').addEventListener('touchmove', (e) => {
+        if (!pinching || e.touches.length !== 2) return;
+        e.preventDefault();
+        const ratio = dist(e.touches) / (startDist || 1);
+        const steps = Math.round((ratio - 1) * 4);
+        const target = Math.max(0, Math.min(ZOOM_STEPS.length - 1, startIdx + steps));
+        if (target !== zoomIdx){ zoomIdx = target; applyZoom(); }
+    }, { passive:false });
+    document.getElementById('wrap').addEventListener('touchend', (e) => { if (e.touches.length < 2) pinching = false; }, { passive:true });
+})();
+
+// ==================== Ghi chú cá nhân trên trang (tô đậm / bút / ghim note / tẩy) ====================
+// Lưu hoàn toàn trên máy người đọc (localStorage), riêng theo từng tài liệu — không gửi lên máy chủ.
+const ANNOT_HIGHLIGHT_COLORS = ['#ffeb3b', '#a6f39a', '#8ecbff', '#ffb3c7', '#ffcc80'];
+const ANNOT_PEN_COLORS = ['#e53935', '#1e88e5', '#222831', '#43a047', '#8e24aa'];
+const annot = { tool: 'none', color: ANNOT_HIGHLIGHT_COLORS[0], straight: true, size: 3 };
+let annotStore = {}; // { [page]: { strokes:[{id,type,color,d,sz}], notes:[{id,x,y,color,text,sz}] } }
+let annotOrder = {}; // { [page]: [itemId,...] } thứ tự thêm vào, dùng cho Hoàn tác
+let drawing = null;  // path đang vẽ dở: { svg, page, el, pts, type, color, size }
+
+// Thanh kéo kích thước dùng mức 1-5 (mặc định 3 = "Vừa"), quy đổi ra số px cụ thể cho từng loại.
+// Mức 3 được chọn TRÙNG với độ dày cố định cũ (tô đậm 28 / bút 6 / ghim note 24px) để các ghi
+// chú đã lưu từ trước (không có trường "sz") vẫn hiển thị y hệt như cũ, không bị đổi hình dạng.
+const SIZE_LABELS = ['Rất nhỏ', 'Nhỏ', 'Vừa', 'Lớn', 'Rất lớn'];
+function highlightWidthFor(sz){ return 14 + ((sz || 3) - 1) * 7; }   // 1..5 -> 14,21,28,35,42
+function penWidthFor(sz){ return 2 + ((sz || 3) - 1) * 2; }          // 1..5 -> 2,4,6,8,10
+function notePinSizeFor(sz){ return 14 + ((sz || 3) - 1) * 5; }      // 1..5 -> 14,19,24,29,34
+function strokeWidthFor(type, sz){ return type === 'highlight' ? highlightWidthFor(sz) : penWidthFor(sz); }
+
+function annotKey(){ return 'sng-doc-annot-' + DOC_ID; }
+function loadAnnotStore(){
+    try{ annotStore = JSON.parse(localStorage.getItem(annotKey())) || {}; }catch(e){ annotStore = {}; }
+    annotOrder = {};
+    Object.keys(annotStore).forEach((p) => updateOrderForPage(p));
+}
+function saveAnnotStore(){
+    try{ localStorage.setItem(annotKey(), JSON.stringify(annotStore)); }catch(e){}
+}
+function pageData(page){
+    if (!annotStore[page]) annotStore[page] = { strokes: [], notes: [] };
+    return annotStore[page];
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function updateOrderForPage(page){
+    const data = annotStore[page];
+    if (!data){ annotOrder[page] = []; return; }
+    const items = [...(data.strokes || []), ...(data.notes || [])].sort((a, b) => a.t - b.t);
+    annotOrder[page] = items.map((it) => it.id);
+}
+
+function renderColorSwatches(){
+    const box = document.getElementById('annotColors');
+    const list = annot.tool === 'pen' ? ANNOT_PEN_COLORS : ANNOT_HIGHLIGHT_COLORS;
+    if (annot.tool !== 'highlight' && annot.tool !== 'pen'){ box.style.display = 'none'; return; }
+    box.style.display = 'flex';
+    if (!list.includes(annot.color)) annot.color = list[0];
+    box.innerHTML = list.map((c) => `<button type="button" class="annot-color${c === annot.color ? ' on' : ''}" style="background:${c}" onclick="setAnnotColor('${c}')"></button>`).join('');
+}
+function setAnnotColor(c){ annot.color = c; renderColorSwatches(); renderSizeRow(); }
+
+function renderModeRow(){
+    const row = document.getElementById('annotModeRow');
+    if (annot.tool !== 'highlight' && annot.tool !== 'pen'){ row.style.display = 'none'; return; }
+    row.style.display = 'flex';
+    document.getElementById('modeFree').classList.toggle('on', !annot.straight);
+    document.getElementById('modeStraight').classList.toggle('on', annot.straight);
+}
+function setAnnotMode(straight){ annot.straight = straight; renderModeRow(); }
+
+function sizeLabelFor(sz){
+    return SIZE_LABELS[Math.max(0, Math.min(4, Math.round(sz) - 1))];
+}
+function renderSizeRow(){
+    const row = document.getElementById('annotSizeRow');
+    const applies = annot.tool === 'pen' || annot.tool === 'highlight' || annot.tool === 'note';
+    row.classList.toggle('show', applies);
+    if (!applies) return;
+    const pct = ((annot.size - 1) / 4) * 100; // size 1..5 -> 0%..100% dọc theo thanh
+    const thumb = document.getElementById('annotSizeThumb');
+    thumb.style.left = pct + '%';
+    thumb.style.background = annot.color;
+    document.getElementById('annotSizeLabel').textContent = sizeLabelFor(annot.size);
+}
+// Kéo trực tiếp trên thanh dài (không phải input range của trình duyệt) để cảm giác giống
+// đang "kéo dày/mỏng nét vẽ" -- bấm ở đâu trên thanh, chấm tròn nhảy tới đó luôn; giữ và rê
+// ngón tay/chuột qua lại để chỉnh liên tục, không phải bấm từng nấc.
+(function initSizeBarDrag(){
+    const bar = document.getElementById('annotSizeBar');
+    let dragging = false;
+    function setFromClientX(clientX){
+        const rect = bar.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        annot.size = 1 + ratio * 4;
+        renderSizeRow();
+    }
+    bar.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        bar.setPointerCapture(e.pointerId);
+        setFromClientX(e.clientX);
+    });
+    bar.addEventListener('pointermove', (e) => { if (dragging) setFromClientX(e.clientX); });
+    bar.addEventListener('pointerup', () => { dragging = false; });
+    bar.addEventListener('pointercancel', () => { dragging = false; });
+})();
+
+function toggleAnnotPanel(){
+    document.getElementById('annotPanel').classList.toggle('show');
+}
+function setTool(tool){
+    annot.tool = tool;
+    document.getElementById('annotFab').classList.toggle('active', tool !== 'none');
+    ['toolCursor:none', 'toolHighlight:highlight', 'toolPen:pen', 'toolNote:note', 'toolEraser:eraser'].forEach((pair) => {
+        const [id, t] = pair.split(':');
+        document.getElementById(id).classList.toggle('on', tool === t);
+    });
+    renderColorSwatches();
+    renderSizeRow();
+    renderModeRow();
+    // Con trỏ hình cục tẩy áp dụng toàn trang (cả lớp vẽ SVG lẫn ghim note) khi bật công cụ tẩy —
+    // gắn ở body vì ghim note nằm ở lớp <div> khác, không phải con của .annot-layer.
+    document.body.classList.toggle('eraser-active', tool === 'eraser');
+    const hints = {
+        none: 'Chọn công cụ rồi tô/viết trực tiếp lên trang. Ghi chú chỉ lưu trên máy này.',
+        highlight: 'Kéo để tô đậm đoạn văn bản cần chú ý.',
+        pen: 'Kéo để viết/khoanh vùng tự do trên trang.',
+        note: 'Chạm vào vị trí bất kỳ trên trang để ghim chú thích.',
+        eraser: 'Chạm hoặc rê ngón tay/chuột qua nét vẽ hay ghim note để xoá — xoá được nhiều nét cùng lúc.'
+    };
+    document.getElementById('annotHint').textContent = hints[tool] || hints.none;
+    document.querySelectorAll('.annot-layer').forEach((svg) => {
+        // touch-action:none cho CẢ tẩy: nếu không, kéo ngón tay để tẩy trên di động sẽ bị trình
+        // duyệt hiểu nhầm là đang cuộn trang thay vì tẩy nhiều nét liên tiếp.
+        svg.classList.toggle('drawable', tool !== 'none');
+        svg.classList.toggle('erase-mode', tool === 'eraser');
+        svg.style.pointerEvents = tool === 'none' ? 'none' : 'all';
+    });
+}
+
+function svgPoint(svg, clientX, clientY){
+    const rect = svg.getBoundingClientRect();
+    const vb = svg.viewBox.baseVal;
+    return {
+        x: ((clientX - rect.left) / rect.width) * vb.width,
+        y: ((clientY - rect.top) / rect.height) * vb.height
+    };
+}
+
+function mountAnnotLayer(slot, page, ratio){
+    const H = Math.round(1000 * ratio);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 1000 ${H}`);
+    svg.setAttribute('class', 'annot-layer' + (annot.tool === 'none' ? '' : ' drawable') + (annot.tool === 'eraser' ? ' erase-mode' : ''));
+    svg.style.pointerEvents = annot.tool === 'none' ? 'none' : 'all';
+    slot.appendChild(svg);
+    ensureAnnotBg(svg, H);
+
+    const notesLayer = document.createElement('div');
+    notesLayer.className = 'notes-layer';
+    // pointer-events:none TRÊN CHÍNH LỚP NÀY: đây là <div> phủ kín cả trang, nằm ĐÈ LÊN TRÊN
+    // lớp vẽ (SVG). Nếu không tắt pointer-events ở đây, div rỗng này sẽ chặn đứng MỌI thao tác
+    // chạm/click trước khi tới được SVG bên dưới -> bút/tô đậm/ghim note đều không phản hồi.
+    // Từng ghim note bên trong (note-pin) được bật lại pointer-events riêng để vẫn bấm được.
+    notesLayer.style.cssText = 'position:absolute;inset:0;z-index:4;pointer-events:none;';
+    slot.appendChild(notesLayer);
+
+    redrawPage(slot, svg, notesLayer, page);
+
+    svg.addEventListener('pointerdown', (e) => onLayerPointerDown(e, slot, svg, notesLayer, page));
+    svg.addEventListener('pointermove', onLayerPointerMove);
+    svg.addEventListener('pointerup', onLayerPointerUp);
+    svg.addEventListener('pointerleave', onLayerPointerUp);
+}
+
+// Nền trong suốt phủ kín toàn bộ canvas SVG. Không có nền này, vùng CHƯA có nét vẽ nào
+// sẽ không bắt được sự kiện con trỏ/chạm ở một số trình duyệt (SVG mặc định chỉ tính
+// pointer-events trên phần "đã tô màu") -> đây là lý do bút/tô đậm/ghim note không phản hồi
+// khi trang còn trống. fill="transparent" vẫn được tính là "đã tô" nên luôn bắt được sự kiện.
+function ensureAnnotBg(svg, H){
+    let bg = svg.querySelector('.annot-bg');
+    if (!bg){
+        bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bg.setAttribute('class', 'annot-bg');
+        bg.setAttribute('fill', 'transparent');
+        svg.insertBefore(bg, svg.firstChild);
+    }
+    bg.setAttribute('x', 0); bg.setAttribute('y', 0);
+    bg.setAttribute('width', 1000); bg.setAttribute('height', H || svg.viewBox.baseVal.height);
+}
+
+function redrawPage(slot, svg, notesLayer, page){
+    svg.innerHTML = '';
+    notesLayer.innerHTML = '';
+    ensureAnnotBg(svg);
+    const data = annotStore[page];
+    if (!data) return;
+    (data.strokes || []).forEach((s) => svg.appendChild(strokeToEl(s, page)));
+    (data.notes || []).forEach((n) => notesLayer.appendChild(noteToEl(n, slot, svg, notesLayer, page)));
+}
+
+function strokeToEl(s, page){
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.dataset.id = s.id;
+    const width = strokeWidthFor(s.type, s.sz);
+
+    // Vùng bắt chạm để xoá RỘNG HƠN nét thật (nét bút mảnh chỉ vài px rất khó chạm trúng bằng
+    // ngón tay) -- trong suốt, không nhìn thấy, chỉ để dễ chạm/kéo trúng hơn khi dùng cục tẩy.
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hit.setAttribute('d', s.d);
+    hit.setAttribute('fill', 'none');
+    hit.setAttribute('stroke', 'transparent');
+    // Đệm rộng hơn bản cũ (pen: 20 -> 40, highlight: 6 -> 20) để khi thu nhỏ trang (zoom 70-85%)
+    // vùng bắt chạm trên màn hình vẫn đủ lớn cho ngón tay, không bị "rê trúng mới xoá được".
+    hit.setAttribute('stroke-width', width + (s.type === 'highlight' ? 20 : 40));
+    hit.setAttribute('stroke-linecap', 'round');
+    hit.setAttribute('stroke-linejoin', 'round');
+    hit.style.pointerEvents = 'stroke';
+    // Gắn TRỰC TIẾP listener xoá ngay trên chính nét vẽ (không chỉ dựa vào phép "dò toạ độ"
+    // eraseAtClientPoint ở tầng document). Đây là lớp bảo hiểm: dò toạ độ giúp kéo-qua-nhiều-nét
+    // xoá liên tiếp, nhưng nếu vì lý do gì đó (trang đã tồn tại lâu, nhiều lớp annot chồng lên
+    // nhau qua nhiều lượt vẽ/xoá...) phép dò toạ độ bị trật, thì cú bấm/chạm trực tiếp lên đúng
+    // nét vẽ vẫn LUÔN xoá được — đây là cơ chế click gốc của trình duyệt, không thể "trật" được.
+    hit.addEventListener('pointerdown', (e) => {
+        if (annot.tool !== 'eraser') return;
+        e.stopPropagation();
+        erasingDrag = true;
+        removeAnnotItem(page, s.id);
+    });
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', s.d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', s.color);
+    path.setAttribute('stroke-width', width);
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    if (s.type === 'highlight'){
+        path.setAttribute('opacity', '0.42');
+        path.style.mixBlendMode = 'multiply';
+    } else {
+        path.setAttribute('opacity', '0.92');
+    }
+    path.style.pointerEvents = 'none';
+
+    g.appendChild(hit);
+    g.appendChild(path);
+    return g;
+}
+
+function noteToEl(n, slot, svg, notesLayer, page){
+    const pin = document.createElement('div');
+    pin.className = 'note-pin';
+    pin.dataset.id = n.id; // dùng để eraseAtClientPoint (xoá kiểu kéo-qua-đâu-xoá-đó) nhận diện
+    const px = notePinSizeFor(n.sz);
+    pin.style.width = px + 'px';
+    pin.style.height = px + 'px';
+    pin.style.margin = `${-(px - 2)}px 0 0 ${-(px / 2)}px`;
+    pin.style.fontSize = Math.max(9, Math.round(px * 0.28)) + 'px';
+    pin.style.left = n.x + '%';
+    pin.style.top = n.y + '%';
+    pin.style.background = n.color;
+    pin.style.pointerEvents = 'auto';
+    pin.innerHTML = '<i class="fa-solid fa-note-sticky"></i>';
+    pin.title = n.text;
+    pin.addEventListener('pointerdown', (e) => {
+        // Bảo hiểm giống hit-path của nét vẽ: bấm/chạm trực tiếp vào ghim luôn xoá được ngay,
+        // không chỉ dựa vào phép dò toạ độ ở tầng document.
+        if (annot.tool !== 'eraser') return;
+        e.stopPropagation();
+        erasingDrag = true;
+        removeAnnotItem(page, n.id);
+    });
+    pin.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Khi đang ở chế độ tẩy: việc xoá đã được xử lý ở pointerdown ngay phía trên, nên tại
+        // đây chỉ cần bỏ qua, không mở trình soạn chú thích.
+        if (annot.tool === 'eraser') return;
+        openNoteEditor(page, n, false, { x: e.clientX, y: e.clientY });
+    });
+    return pin;
+}
+
+function removeAnnotItem(page, id){
+    const data = pageData(page);
+    data.strokes = (data.strokes || []).filter((s) => s.id !== id);
+    data.notes = (data.notes || []).filter((n) => n.id !== id);
+    updateOrderForPage(page);
+    saveAnnotStore();
+    rerenderPage(page);
+}
+
+function rerenderPage(page){
+    const slot = document.querySelector(`.page-slot[data-page="${page}"]`);
+    if (!slot) return;
+    const svg = slot.querySelector('.annot-layer');
+    const notesLayer = slot.querySelector('.notes-layer');
+    if (svg && notesLayer) redrawPage(slot, svg, notesLayer, page);
+}
+
+function onLayerPointerDown(e, slot, svg, notesLayer, page){
+    if (annot.tool === 'none' || annot.tool === 'eraser') return;
+    const pt = svgPoint(svg, e.clientX, e.clientY);
+    if (annot.tool === 'note'){
+        openNoteEditor(page, {
+            id: uid(), x: (pt.x / 1000) * 100, y: (pt.y / svg.viewBox.baseVal.height) * 100,
+            color: annot.color, sz: annot.size, text: ''
+        }, true, { x: e.clientX, y: e.clientY });
+        return;
+    }
+    svg.setPointerCapture(e.pointerId);
+    drawing = { svg, page, pts: [pt], type: annot.tool, color: annot.color, straight: annot.straight, size: annot.size };
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', annot.color);
+    path.setAttribute('stroke-width', strokeWidthFor(annot.tool, annot.size));
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    if (annot.tool === 'highlight'){ path.setAttribute('opacity', '0.42'); path.style.mixBlendMode = 'multiply'; }
+    else { path.setAttribute('opacity', '0.92'); }
+    path.setAttribute('d', `M ${pt.x} ${pt.y}`);
+    svg.appendChild(path);
+    drawing.el = path;
+}
+function onLayerPointerMove(e){
+    if (!drawing || drawing.svg !== e.currentTarget) return;
+    const pt = svgPoint(drawing.svg, e.clientX, e.clientY);
+    drawing.pts.push(pt);
+    if (drawing.straight){
+        // Chế độ "Thẳng": vẽ 1 ĐƯỜNG THẲNG từ điểm bắt đầu tới điểm hiện tại (giống thước kẻ)
+        // thay vì đi theo từng điểm tay di chuyển -> tay hơi run vẫn ra đường thẳng hàng.
+        const start = drawing.pts[0];
+        drawing.el.setAttribute('d', `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`);
+    } else {
+        drawing.el.setAttribute('d', drawing.pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' '));
+    }
+}
+// ---- Tẩy: kéo qua đâu xoá đó ----
+// Trước đây mỗi nét/ghim note tự gắn 1 pointerdown riêng để tự xoá chính nó khi bấm trúng,
+// nên phải bấm đi bấm lại từng nét một. Giờ chuyển sang bắt sự kiện con trỏ ở TẦNG DOCUMENT
+// (không phải ở svg), rồi dùng elementsFromPoint để dò xem đang đè lên nét/ghim note nào tại
+// đúng toạ độ đó -- nhờ vậy vừa xoá được lúc chạm/bấm xuống, vừa xoá tiếp khi rê qua trong lúc
+// vẫn đang giữ chuột/ngón tay (không cần nhấc lên bấm lại), kể cả khi bắt đầu kéo ngay trên 1 nét.
+let erasingDrag = false;
+function eraseAtClientPoint(clientX, clientY, page){
+    try{
+        const els = document.elementsFromPoint(clientX, clientY);
+        for (const el of els){
+            const pin = el.closest && el.closest('.note-pin');
+            if (pin && pin.dataset.id){ removeAnnotItem(page, pin.dataset.id); return; }
+            const g = el.closest && el.closest('g[data-id]');
+            if (g && g.dataset.id){ removeAnnotItem(page, g.dataset.id); return; }
+        }
+    }catch(e){ /* không để 1 lỗi bất thường làm gãy cả thao tác kéo-xoá đang diễn ra */ }
+}
+document.addEventListener('pointerdown', (e) => {
+    if (annot.tool !== 'eraser') return;
+    const slot = e.target.closest && e.target.closest('.page-slot');
+    if (!slot) return;
+    erasingDrag = true;
+    eraseAtClientPoint(e.clientX, e.clientY, Number(slot.dataset.page));
+});
+document.addEventListener('pointermove', (e) => {
+    if (!erasingDrag || annot.tool !== 'eraser') return;
+    // Dò trực tiếp bằng toạ độ (không dựa vào e.target) để vẫn bắt trúng dù ngón tay/chuột
+    // đã rê sang phần trang khác kể từ lúc bấm xuống.
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const slot = el && el.closest && el.closest('.page-slot');
+    if (!slot) return;
+    eraseAtClientPoint(e.clientX, e.clientY, Number(slot.dataset.page));
+});
+document.addEventListener('pointerup', () => { erasingDrag = false; });
+document.addEventListener('pointercancel', () => { erasingDrag = false; });
+// Nhỡ đang giữ kéo để tẩy mà chuyển tab / cửa sổ mất focus (vd. bị popup, chuyển app trên di
+// động) thì pointerup có thể không bao giờ bắn tới -> erasingDrag bị "kẹt" true mãi, lần chạm
+// tiếp theo dù chỉ là chạm nhẹ cũng bị hiểu nhầm thành đang kéo. Dọn trạng thái ở đây cho chắc.
+window.addEventListener('blur', () => { erasingDrag = false; });
+document.addEventListener('visibilitychange', () => { if (document.hidden) erasingDrag = false; });
+
+function onLayerPointerUp(){
+    if (!drawing) return;
+    if (drawing.pts.length > 1){
+        const s = { id: uid(), t: Date.now(), type: drawing.type, color: drawing.color, sz: drawing.size, d: drawing.el.getAttribute('d') };
+        pageData(drawing.page).strokes.push(s);
+        updateOrderForPage(drawing.page);
+        saveAnnotStore();
+    } else {
+        drawing.el.remove();
+    }
+    drawing = null;
+}
+
+function openNoteEditor(page, note, isNew, clientPos){
+    document.querySelectorAll('.note-editor').forEach((el) => el.remove());
+    const box = document.createElement('div');
+    box.className = 'note-editor';
+    box.style.position = 'fixed';
+    const left = Math.min(Math.max(clientPos.x - 20, 8), window.innerWidth - 228);
+    const top = Math.min(Math.max(clientPos.y - 20, 8), window.innerHeight - 170);
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    box.innerHTML = `
+        <textarea placeholder="Nhập chú thích của bạn...">${escapeHtml(note.text || '')}</textarea>
+        <div class="row">
+            <button class="save"><i class="fa-solid fa-check"></i> Lưu</button>
+            ${isNew ? '' : '<button class="del"><i class="fa-solid fa-trash"></i> Xoá</button>'}
+        </div>`;
+    document.body.appendChild(box);
+    const ta = box.querySelector('textarea');
+    ta.focus();
+    // Lắng nghe "bấm ra ngoài để đóng". QUAN TRỌNG: phải gỡ listener này ở MỌI đường thoát khỏi
+    // hộp soạn (Lưu / Xoá / bấm ra ngoài) — trước đây chỉ tự gỡ khi chính nó bắn ra (bấm ra
+    // ngoài), nên mỗi lần người dùng bấm "Lưu" thay vì bấm ra ngoài, 1 listener bị bỏ quên mãi
+    // trên document. Dùng nhiều lần (sửa/thêm nhiều ghi chú trong 1 phiên đọc) sẽ tích tụ rất
+    // nhiều listener "chết" chồng lên document, âm thầm làm chậm và dễ gây tương tác lạ về sau.
+    let outsideHandler = null;
+    function detachOutsideHandler(){
+        if (outsideHandler) document.removeEventListener('pointerdown', outsideHandler);
+        outsideHandler = null;
+    }
+    setTimeout(() => {
+        outsideHandler = function outside(e){
+            if (box.contains(e.target)) return;
+            detachOutsideHandler();
+            if (document.body.contains(box)) box.remove();
+        };
+        document.addEventListener('pointerdown', outsideHandler);
+    }, 0);
+    box.querySelector('.save').onclick = () => {
+        detachOutsideHandler();
+        const text = ta.value.trim();
+        box.remove();
+        if (!text) return;
+        const data = pageData(page);
+        const idx = data.notes.findIndex((n) => n.id === note.id);
+        const saved = { id: note.id, t: Date.now(), x: note.x, y: note.y, color: note.color, sz: note.sz, text };
+        if (idx >= 0) data.notes[idx] = saved; else data.notes.push(saved);
+        updateOrderForPage(page);
+        saveAnnotStore();
+        rerenderPage(page);
+    };
+    const delBtn = box.querySelector('.del');
+    if (delBtn) delBtn.onclick = () => { detachOutsideHandler(); box.remove(); removeAnnotItem(page, note.id); };
+}
+
+function undoAnnot(){
+    const ids = annotOrder[currentPage] || [];
+    const lastId = ids.pop();
+    if (!lastId) return;
+    removeAnnotItem(currentPage, lastId);
+}
+
+function clearPageAnnot(){
+    if (!confirm(`Xoá toàn bộ ghi chú trên trang ${currentPage}?`)) return;
+    delete annotStore[currentPage];
+    saveAnnotStore();
+    rerenderPage(currentPage);
+}
+
+// ---------- Nạp tài liệu ----------
 async function boot(){
+    try{ const z = parseInt(localStorage.getItem('sng-doc-zoom'), 10); if (Number.isFinite(z) && ZOOM_STEPS[z]) zoomIdx = z; }catch(e){}
+    applyZoom();
+
     if (!DOC_ID){
         showState('<i class="fa-solid fa-circle-exclamation"></i>Thiếu tài liệu cần xem.');
         return;
     }
+    loadAnnotStore();
 
-    const { data: { session } } = await sb.auth.getSession();
+    let { data: { session } } = await sb.auth.getSession();
+    // Làm mới session từ server để nhận ngay quyền Pro vừa được cấp, không dựa vào bản cache cũ
+    // (tránh trường hợp đã có Pro nhưng viewer vẫn khoá/không nhận ra).
+    if (session){
+        try{
+            const { data, error } = await sb.auth.refreshSession();
+            if (!error && data && data.session) session = data.session;
+        }catch(e){}
+    }
     currentSession = session;
     watermarkLabel = session ? (session.user.email || 'SNG EDU') : 'SNG EDU · Khách';
 
@@ -152,9 +876,17 @@ async function boot(){
     const paidList = Array.isArray(payload.paid) ? payload.paid : [];
     const freeList = Array.isArray(payload.free) ? payload.free : [];
 
-    let item = paidList.find((it) => String(it.id) === DOC_ID);
+    // Nếu 1 ID bị lưu trùng thành 2 dòng trong cùng mảng (lỗi thao tác ở admin), .find() thường
+    // lấy nhầm dòng đầu tiên (có thể là bản CHƯA tách trang) -> hiện lầm lỗi "chưa hỗ trợ xem
+    // trước theo trang" dù tài liệu đã được tách. Ưu tiên bản đã tách trang xong nếu có trùng ID.
+    function pickDocMatch(arr, id){
+        const matches = arr.filter((it) => String(it.id) === String(id));
+        if (!matches.length) return null;
+        return matches.find((it) => it.preview_mode === 'pages' && it.pages_ready) || matches[matches.length - 1];
+    }
+    let item = pickDocMatch(paidList, DOC_ID);
     isPaidDoc = !!item;
-    if (!item) item = freeList.find((it) => String(it.id) === DOC_ID);
+    if (!item) item = pickDocMatch(freeList, DOC_ID);
 
     if (!item || item.preview_mode !== 'pages'){
         showState('<i class="fa-solid fa-circle-exclamation"></i>Tài liệu này chưa hỗ trợ xem trước theo trang.<br><a href="index.html#doc">Quay lại trang Tài liệu</a>');
@@ -165,48 +897,102 @@ async function boot(){
     document.title = `${item.title || 'Tài liệu'} · SNG EDU`;
     document.getElementById('docTitle').textContent = item.title || 'Tài liệu';
 
-    const pagesTotal = Number(item.pages_total) || 0;
-    document.getElementById('pagesCount').textContent = pagesTotal ? `${pagesTotal} trang` : '';
+    pagesTotal = Number(item.pages_total) || 0;
 
-    // Quyền xem full (chỉ để hiển thị UI cho đẹp — quyền THẬT được Edge Function kiểm tra lại)
-    // CHỈ Pro mới mở khoá — không có luồng mua lẻ tài liệu để xem.
+    // Quyền xem full (chỉ để hiện UI cho đúng — quyền THẬT do Edge Function kiểm tra lại).
+    // Tài liệu trả phí: CHỈ tài khoản đang có Pro (VIP) mới mở khoá toàn bộ trang.
     let hasFullAccess = !isPaidDoc;
-    if (isPaidDoc && currentSession && isProActive(currentSession.user)){
-        hasFullAccess = true;
-    }
+    if (isPaidDoc && currentSession && isProActive(currentSession.user)) hasFullAccess = true;
+    if (!hasFullAccess) document.getElementById('proBtn').style.display = '';
 
-    renderPages(pagesTotal, hasFullAccess);
+    renderPages(pagesTotal);
+
+    // Mở từ link báo lỗi của admin (?page=N) -> nhảy thẳng tới trang đó
+    const startPage = parseInt(params.get('page'), 10);
+    if (Number.isFinite(startPage) && startPage > 1){
+        const t = document.querySelector(`.page-slot[data-page="${Math.min(pagesTotal, startPage)}"]`);
+        if (t) t.scrollIntoView({ block: 'start' });
+    }
 }
 
-function renderPages(pagesTotal, hasFullAccess){
+function renderPages(total){
     const wrap = document.getElementById('wrap');
     wrap.innerHTML = '';
-    if (!pagesTotal){
+    lockedFromPage = Infinity; lockBox = null;
+    if (!total){
         showState('<i class="fa-solid fa-circle-exclamation"></i>Tài liệu chưa có trang nào.');
         return;
     }
 
+    // Tỉ lệ trang lấy từ lúc admin tách (page_w/page_h) -> chừa sẵn đúng khung, trang không
+    // bị "nhảy" khi ảnh tải xong. Tài liệu tách bằng bản cũ chưa có 2 số này -> tạm dùng A4.
+    const pw = Number(currentItem.page_w) || 0;
+    const ph = Number(currentItem.page_h) || 0;
+    const ratio = (pw > 0 && ph > 0) ? (ph / pw) : 1.414;
+
     const slots = [];
-    for (let p = 1; p <= pagesTotal; p++){
+    for (let p = 1; p <= total; p++){
         const slot = document.createElement('div');
         slot.className = 'page-slot';
         slot.dataset.page = p;
-        slot.innerHTML = `<div class="page-loading"><i class="fa-solid fa-spinner fa-spin"></i>Trang ${p}</div>`;
+        slot.dataset.ratio = ratio;
+        slot.style.aspectRatio = `1 / ${ratio}`;
+        slot.innerHTML = `<div class="ph"><i class="fa-solid fa-spinner fa-spin"></i>Trang ${p}</div>`;
         wrap.appendChild(slot);
         slots.push(slot);
     }
 
     // Lazy-load: chỉ gọi API khi trang sắp lọt vào khung nhìn, đỡ tốn băng thông
-    const observer = new IntersectionObserver((entries) => {
+    const loader = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
             if (entry.isIntersecting){
-                observer.unobserve(entry.target);
+                loader.unobserve(entry.target);
                 loadPage(entry.target);
             }
         });
-    }, { rootMargin: '600px 0px' });
+    }, { rootMargin: '900px 0px' });
+    slots.forEach((s) => loader.observe(s));
 
-    slots.forEach((s) => observer.observe(s));
+    // Theo dõi trang đang đọc để hiện "x / N" ở thanh nổi phía dưới
+    const tracker = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) currentPage = Number(entry.target.dataset.page) || currentPage;
+        });
+        updatePager();
+    }, { rootMargin: '-45% 0px -45% 0px' });
+    slots.forEach((s) => tracker.observe(s));
+
+    document.getElementById('pager').classList.add('show');
+    updatePager();
+}
+
+// Báo lỗi tài liệu: mở form góp ý (gop-y.html) đã điền sẵn tên tài liệu + trang đang đọc.
+// Admin thấy trong mục Góp ý dòng "📄 Tài liệu: ... — Trang N" và bấm "Trang gốc" sẽ nhảy đúng trang đó.
+function openReport(){
+    const title = (currentItem && currentItem.title) || document.getElementById('docTitle').textContent || 'Tài liệu';
+    const page = currentPage || 1;
+    const origin = `${location.origin}${location.pathname}?id=${encodeURIComponent(DOC_ID)}&page=${page}`;
+    const q = new URLSearchParams({
+        type: 'other',
+        doc: '1',
+        question: `📄 Tài liệu: ${title} — Trang ${page}`,
+        origin
+    });
+    location.href = 'gop-y.html?' + q.toString();
+    return false;
+}
+
+function updatePager(){
+    document.getElementById('pagerLabel').textContent = `${currentPage} / ${pagesTotal}`;
+}
+function jumpToPage(){
+    const input = document.getElementById('pagerInput');
+    const p = parseInt(input.value, 10);
+    if (!Number.isFinite(p)) return;
+    const target = document.querySelector(`.page-slot[data-page="${Math.max(1, Math.min(pagesTotal, p))}"]`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    input.value = '';
+    input.blur();
 }
 
 async function loadPage(slot){
@@ -221,55 +1007,104 @@ async function loadPage(slot){
         const res = await fetch(`${DOC_PAGES_FN_URL}?doc_id=${encodeURIComponent(DOC_ID)}&page=${page}`, { headers });
 
         if (res.status === 403){
-            const info = await res.json().catch(() => ({}));
-            renderLockedFrom(slot, info);
+            renderLockedFrom(slot);
             return;
         }
         if (!res.ok) throw new Error('Không tải được trang ' + page);
 
         const blob = await res.blob();
         const objUrl = URL.createObjectURL(blob);
-        slot.innerHTML = `<div class="page-img" style="background-image:url('${objUrl}')"></div>${watermarkHtml()}<div class="page-num">${page}</div>`;
+
+        // Dùng thẻ <img> thật (thay cho background-image như bản cũ): trình duyệt biết kích
+        // thước pixel gốc nên thu nhỏ bằng bộ lọc chất lượng cao -> chữ nét hơn hẳn, và khung
+        // tự khớp đúng tỉ lệ của TỪNG trang (tài liệu lẫn trang ngang/dọc vẫn hiển thị đúng).
+        const img = new Image();
+        img.className = 'page-img';
+        img.alt = 'Trang ' + page;
+        img.decoding = 'async';
+        img.draggable = false;
+        img.onload = () => {
+            const ratio = img.naturalHeight / img.naturalWidth;
+            slot.dataset.ratio = ratio;
+            slot.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+            slot.innerHTML = '';
+            slot.appendChild(img);
+            slot.insertAdjacentHTML('beforeend', watermarkHtml() + `<div class="page-num">${page}</div>`);
+            mountAnnotLayer(slot, page, ratio);
+        };
+        img.onerror = () => {
+            slot.innerHTML = `<div class="ph"><i class="fa-solid fa-triangle-exclamation"></i>Lỗi hiển thị trang ${page}</div>`;
+        };
+        img.src = objUrl;
     }catch(e){
-        slot.innerHTML = `<div class="page-loading"><i class="fa-solid fa-triangle-exclamation"></i>Lỗi tải trang ${page}</div>`;
+        slot.innerHTML = `<div class="ph"><i class="fa-solid fa-triangle-exclamation"></i>Lỗi tải trang ${page}</div>`;
     }
 }
 
+// Trạng thái khoá: chỉ có DUY NHẤT 1 khối khoá cho cả tài liệu.
+// Các trang được lazy-load song song nên nhiều trang bị khoá có thể cùng trả 403 gần như
+// đồng thời (và không theo thứ tự). Nếu mỗi 403 tự dựng 1 khối riêng thì sẽ bị lặp nhiều
+// khối "Còn 1 trang đang khoá". Vì vậy ta nhớ trang khoá SỚM NHẤT đã biết và chỉ cập nhật
+// lại 1 khối duy nhất.
+let lockedFromPage = Infinity;
+let lockBox = null;
+
 function renderLockedFrom(fromSlot){
-    // Xoá mọi slot còn lại từ đây trở đi (chưa render), thay bằng 1 khối khoá + CTA
-    let sib = fromSlot;
-    const toRemove = [];
-    while (sib){
-        const next = sib.nextElementSibling;
-        toRemove.push(sib);
-        sib = next;
-    }
-    const remainingCount = toRemove.length;
-    toRemove.forEach((el) => el.remove());
+    const page = Number(fromSlot && fromSlot.dataset && fromSlot.dataset.page);
+    if (!Number.isFinite(page)) return;
+    // Đã biết khoá từ trang này (hoặc sớm hơn) rồi -> bỏ qua, không dựng thêm khối
+    if (page >= lockedFromPage) return;
+    lockedFromPage = page;
 
     const wrap = document.getElementById('wrap');
-    const box = document.createElement('div');
-    box.className = 'lock-card';
+
+    // Xoá mọi slot từ trang khoá đầu tiên trở đi (kể cả slot đã render dở)
+    wrap.querySelectorAll('.page-slot').forEach((el) => {
+        if (Number(el.dataset.page) >= lockedFromPage) el.remove();
+    });
+
+    const remainingCount = Math.max(1, pagesTotal - lockedFromPage + 1);
+
+    document.getElementById('pager').classList.remove('show');
+
     const loggedIn = !!currentSession;
-    box.innerHTML = `
-        <i class="fa-solid fa-lock"></i>
-        <h3>Còn ${remainingCount} trang nữa</h3>
+    const nextUrl = location.pathname.replace(/^\//, '') + location.search;
+    const html = `
+        <div class="crown"><i class="fa-solid fa-crown"></i></div>
+        <h3>Còn ${remainingCount} trang đang khoá</h3>
         <p>${loggedIn
-            ? 'Nâng cấp Pro để xem toàn bộ nội dung tài liệu này.'
-            : 'Đăng nhập rồi nâng cấp Pro để xem toàn bộ nội dung tài liệu này.'}</p>
+            ? 'Nâng cấp Pro (VIP) để mở khoá và đọc trọn bộ tài liệu này ngay trên web.'
+            : 'Đăng nhập rồi nâng cấp Pro (VIP) để mở khoá và đọc trọn bộ tài liệu này.'}</p>
+        <div class="perks">
+            <div class="perk"><i class="fa-solid fa-circle-check"></i><span>Xem full ${pagesTotal} trang của tài liệu này</span></div>
+            <div class="perk"><i class="fa-solid fa-circle-check"></i><span>Mở khoá luôn các tài liệu Pro khác trên SNG EDU</span></div>
+            <div class="perk"><i class="fa-solid fa-circle-check"></i><span>Kích hoạt tự động ngay sau khi thanh toán</span></div>
+        </div>
         <div class="lock-actions">
-            ${loggedIn ? '' : `<a class="btn btn-ghost" href="account/login.html?next=${encodeURIComponent(location.pathname + location.search)}"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</a>`}
-            <a class="btn btn-primary" href="nhan-pro.html"><i class="fa-solid fa-crown"></i> Nâng cấp Pro</a>
+            ${loggedIn ? '' : `<a class="btn btn-ghost" href="account/login.html?next=${encodeURIComponent(nextUrl)}"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</a>`}
+            <a class="btn btn-primary" href="index.html?openPro=1#doc"><i class="fa-solid fa-crown"></i> Nâng cấp Pro</a>
         </div>`;
-    wrap.appendChild(box);
+
+    if (!lockBox){
+        lockBox = document.createElement('div');
+        lockBox.className = 'lock-card';
+    }
+    lockBox.innerHTML = html;
+    wrap.appendChild(lockBox); // appendChild trên node đã có sẽ chuyển nó xuống cuối, không nhân bản
 }
 
 // Rào cản cơ bản chống copy/in — không chặn được 100% (chụp màn hình/quay phim thì
 // không công nghệ web nào chặn nổi), nhưng chặn được thao tác phổ biến nhất.
 document.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
+    const k = (e.key || '').toLowerCase();
     if ((e.ctrlKey || e.metaKey) && (k === 'p' || k === 's' || k === 'u')){
         e.preventDefault();
+        return;
+    }
+    // Ctrl +/- : phóng to/thu nhỏ khung đọc thay vì zoom cả trình duyệt
+    if ((e.ctrlKey || e.metaKey) && (k === '+' || k === '=' || k === '-')){
+        e.preventDefault();
+        zoomStep(k === '-' ? -1 : 1);
     }
 });
 

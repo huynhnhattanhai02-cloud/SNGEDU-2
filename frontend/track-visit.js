@@ -10,8 +10,8 @@
 //    window.sngTrackVisit('quiz', 'Trắc nghiệm') mỗi khi chuyển mục.
 // ============================================================
 (function () {
-    var SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-    var SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+    var SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+    var SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
 
     function uuid() {
         if (window.crypto && crypto.randomUUID) return crypto.randomUUID();

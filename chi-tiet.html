@@ -203,6 +203,11 @@
     .pd-cta.owned{ background:var(--brand-bg); color:var(--brand); }
     .pd-cta.free{ background:var(--green-bg); color:var(--green); }
     .pd-cta.outline{ background:transparent; color:var(--ink); border:1.5px solid var(--line); }
+    .pd-report{
+        display:inline-flex; align-items:center; gap:7px; font-size:.84rem; font-weight:600;
+        color:var(--ink-soft); text-decoration:none; margin:2px 0 6px;
+    }
+    .pd-report:hover{ color:var(--red); }
 
     .pd-desc{ color:var(--ink-soft); font-size:.94rem; line-height:1.75; margin:18px 0 24px; white-space:pre-line; overflow-wrap:break-word; word-break:break-word; }
 
@@ -264,8 +269,8 @@
 
 <script src="frontend/usage-limits.js"></script>
 <script>
-const SUPABASE_URL = 'https://sakombvgdobdehbvsfjw.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_gsXHbhvTTlYPyaa58FkNOQ_IylV8uEU';
+const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ---------------- Loại nội dung: 'product' (sản phẩm) hoặc 'doc' (tài liệu) — lấy từ ?type= ----------------
@@ -328,7 +333,7 @@ function showState(html, isError){
 async function loadFooterSettings(){
     const el = document.getElementById('siteFooter');
     try{
-        const { data, error } = await sb.from('site_settings').select('*').eq('key', 'site_footer').single();
+        const { data, error } = await sb.from('site_settings').select('payload').eq('key', 'site_footer').single();
         if (error || !data || !data.payload || !data.payload.text){
             if (el) el.textContent = ''; // chưa cấu hình ở admin -> để trống, không dùng chữ mặc định
             return;
@@ -340,7 +345,16 @@ async function loadFooterSettings(){
 }
 
 async function loadPage(){
-    const { data: { session } } = await sb.auth.getSession();
+    let { data: { session } } = await sb.auth.getSession();
+    // Làm mới session từ server (không chỉ dùng bản cache local) để nếu tài khoản vừa được
+    // admin cộng/gia hạn Pro thì trang chi tiết nhận ra NGAY, không phải đợi token tự refresh
+    // (nếu không sẽ bị lỗi: đã có Pro nhưng vẫn thấy "Nâng cấp Pro để xem").
+    if (session){
+        try{
+            const { data, error } = await sb.auth.refreshSession();
+            if (!error && data && data.session) session = data.session;
+        }catch(e){ /* mạng lỗi -> cứ dùng session cache cũ, không chặn trang */ }
+    }
     currentSession = session;
 
     loadFooterSettings();
@@ -356,7 +370,15 @@ async function loadPage(){
         return;
     }
 
-    if (TYPE === 'doc') await loadDocItem(); else await loadProductItem();
+    // Bọc trong try/catch: nếu có lỗi JS bất ngờ trong lúc dựng giao diện, hiện thông báo lỗi
+    // kèm nút thử lại thay vì để trang treo mãi ở "Đang tải..." (khách sẽ tưởng mạng chậm).
+    try{
+        if (TYPE === 'doc') await loadDocItem(); else await loadProductItem();
+    }catch(e){
+        console.error(e);
+        showState(`<i class="fa-solid fa-triangle-exclamation"></i>Có lỗi khi tải ${TYPE === 'doc' ? 'tài liệu' : 'sản phẩm'} này.<br>
+            <a href="javascript:void(0)" onclick="loadPage()">Thử lại</a> · <a href="${backFallback}">Quay lại danh sách</a>`, true);
+    }
 }
 
 // ==================== SẢN PHẨM ====================
@@ -588,9 +610,19 @@ async function loadDocItem(){
 
     const free = Array.isArray(payload.free) ? payload.free : [];
     const paid = Array.isArray(payload.paid) ? payload.paid : [];
-    let item = free.find(it => String(it.id) === String(ITEM_ID));
-    let isPaid = false;
-    if (!item){ item = paid.find(it => String(it.id) === String(ITEM_ID)); isPaid = !!item; }
+    // Ưu tiên tìm trong paid[] trước: nếu 1 ID lỡ nằm ở CẢ HAI mảng (do 1 bug đã sửa ở admin —
+    // tài liệu VIP từng bị ghi thừa 1 bản vào free[]), bản paid/vip mới là "sự thật".
+    // Nếu 1 ID bị lưu trùng thành 2 dòng trong cùng mảng (lỗi thao tác ở admin), .find() chỉ lấy
+    // dòng ĐẦU TIÊN nên có thể nhận nhầm bản dữ liệu cũ/thiếu (VD: bản chưa tách trang) dù khách
+    // bấm vào thẻ của bản đã tách trang. Ưu tiên bản đã tách trang xong (pages_ready) nếu có trùng.
+    function pickDocMatch(arr, id){
+        const matches = arr.filter(it => String(it.id) === String(id));
+        if (!matches.length) return null;
+        return matches.find(it => it.preview_mode === 'pages' && it.pages_ready) || matches[matches.length - 1];
+    }
+    let item = pickDocMatch(paid, ITEM_ID);
+    let isPaid = !!item;
+    if (!item) item = pickDocMatch(free, ITEM_ID);
 
     if (!item){
         document.getElementById('headerTitle').textContent = 'Không tìm thấy tài liệu';
@@ -600,8 +632,12 @@ async function loadDocItem(){
     currentItem = item;
     currentIsPaid = isPaid;
 
+    // 3 loại tài liệu: free (tải tự do) · paid/buy (mua lẻ) · vip (item.access === 'pro' — nạp VIP mới xem)
+    const isVip = item.access === 'pro';
+    const isPro = !!(currentSession && window.SNG_USAGE && SNG_USAGE.isProActive(currentSession.user));
+
     let owned = false;
-    if (isPaid && currentSession){
+    if (isPaid && !isVip && currentSession){
         try{
             const { data } = await sb.from('document_purchases').select('document_id').eq('user_id', currentSession.user.id).eq('document_id', String(ITEM_ID));
             owned = !!(data && data.length);
@@ -620,11 +656,26 @@ async function loadDocItem(){
 
     let priceHtml = '';
     if (isPaid && owned) priceHtml = `<div class="pd-price owned"><i class="fa-solid fa-circle-check"></i> Đã mua${priceLabel ? ' · ' + priceLabel : ''}</div>`;
-    else if (isPaid && priceLabel) priceHtml = `<div class="pd-price">${priceLabel}</div>`;
+    else if (isPaid && !isVip && priceLabel) priceHtml = `<div class="pd-price">${priceLabel}</div>`;
     else if (!isPaid) priceHtml = `<div class="pd-price free"><i class="fa-solid fa-unlock"></i> Miễn phí</div>`;
+    // Tài liệu VIP: không hiện dòng "Dành cho thành viên Pro" nữa — chỉ còn đúng 1 nút bấm để đọc,
+    // giống hệt tài liệu free/trả phí (khoá Pro thật sự vẫn do CTA + Edge Function xử lý bên dưới).
 
     let ctaHtml = '';
-    if (!isPaid){
+    if (isVip){
+        // Tài liệu VIP: không bán lẻ. Có Pro -> tải/đọc được ngay, chưa có -> mời nâng cấp.
+        if (isPro){
+            ctaHtml = item.link
+                ? `<a class="pd-cta owned" href="${escapeHtml(item.link)}" target="_blank" rel="noopener"><i class="fa-solid fa-download"></i> Tải xuống (Pro)</a>`
+                : `<button class="pd-cta owned" disabled><i class="fa-solid fa-crown"></i> Đang cập nhật nội dung</button>`;
+        } else {
+            // "Nâng cấp Pro" ở đây phải đưa khách tới CỔNG THANH TOÁN gói Premium (modal chọn gói + trả phí
+            // ở trang chủ), KHÔNG phải trang "Nhận Pro miễn phí" (đó là trang đổi tài liệu/báo lỗi lấy Pro,
+            // hai việc khác nhau). Trang này không có sẵn modal thanh toán nên điều hướng về trang chủ kèm
+            // ?openPro=1 — trang chủ đã có sẵn cơ chế tự mở modal nâng cấp Pro khi thấy tham số này.
+            ctaHtml = `<a class="pd-cta" href="index.html?openPro=1#doc"><i class="fa-solid fa-crown"></i> Nâng cấp Pro để xem</a>`;
+        }
+    } else if (!isPaid){
         const disabled = !item.link;
         ctaHtml = disabled
             ? `<button class="pd-cta free" disabled><i class="fa-solid fa-hourglass-half"></i> Sắp ra mắt</button>`
@@ -645,27 +696,44 @@ async function loadDocItem(){
     // Tài liệu đã bật "xem trước theo trang" -> ghi đè hẳn CTA cũ (không còn mua lẻ,
     // chỉ Pro mới mở khoá xem hết trang, xem qua doc-preview-viewer.html)
     if (item.preview_mode === 'pages' && item.pages_ready){
+        const label = 'Đọc tài liệu';
         ctaHtml = `<a class="pd-cta" href="doc-preview-viewer.html?id=${encodeURIComponent(String(ITEM_ID))}">
-                        <i class="fa-solid fa-eye"></i> Xem trước ${item.free_pages || 0}/${item.pages_total || '?'} trang — cần Pro để xem hết
+                        <i class="fa-solid fa-eye"></i> ${label}
                    </a>`;
+        if (isVip && isPro && item.link){
+            ctaHtml += `<a class="pd-cta outline" href="${escapeHtml(item.link)}" target="_blank" rel="noopener"><i class="fa-solid fa-download"></i> Tải file gốc</a>`;
+        }
+    }
+
+    // Link "Báo lỗi tài liệu" -> form góp ý đã điền sẵn tên tài liệu
+    {
+        const rp = new URLSearchParams({
+            type: 'other',
+            doc: '1',
+            question: `📄 Tài liệu: ${item.title || ''}`,
+            origin: location.href
+        });
+        ctaHtml += `<a class="pd-report" href="gop-y.html?${rp.toString()}"><i class="fa-solid fa-flag"></i> Báo lỗi tài liệu này</a>`;
     }
 
     const specs = [];
-    specs.push(isPaid
+    specs.push(isVip
+        ? { lbl:'Trạng thái', val: isPro ? 'Pro — đã mở khoá' : 'Cần Pro', icon:'fa-crown', bg:'var(--amber-bg)', fg:'var(--amber)' }
+        : isPaid
         ? (owned
             ? { lbl:'Trạng thái', val:'Đã mua', icon:'fa-circle-check', bg:'var(--green-bg)', fg:'var(--green)' }
             : { lbl:'Trạng thái', val:'Trả phí', icon:'fa-lock', bg:'var(--amber-bg)', fg:'var(--amber)' })
         : { lbl:'Trạng thái', val:'Miễn phí', icon:'fa-unlock', bg:'var(--green-bg)', fg:'var(--green)' });
     specs.push({ lbl:'Giá', val: priceLabel || 'Miễn phí', icon:'fa-tag', bg:'var(--brand-bg)', fg:'var(--brand)' });
     specs.push({ lbl:'Định dạng', val: item.size || 'PDF', icon:'fa-file-lines', bg:'var(--blue-bg)', fg:'var(--blue)' });
-    specs.push({ lbl:'Loại tài liệu', val: isPaid ? 'Tài liệu trả phí' : 'Tài liệu miễn phí', icon:'fa-graduation-cap', bg:'var(--purple-bg)', fg:'var(--purple)' });
+    specs.push({ lbl:'Loại tài liệu', val: isVip ? 'Tài liệu VIP (Pro)' : (isPaid ? 'Tài liệu trả phí' : 'Tài liệu miễn phí'), icon:'fa-graduation-cap', bg:'var(--purple-bg)', fg:'var(--purple)' });
 
     renderDetail({
         eyebrow: '<i class="fa-solid fa-file-lines"></i> Tài liệu',
         mediaHtml, title: item.title, priceHtml, ctaHtml, desc: item.desc, specs
     });
 
-    if (isPaid && !owned && !(item.preview_mode === 'pages' && item.pages_ready)){
+    if (isPaid && !isVip && !owned && !(item.preview_mode === 'pages' && item.pages_ready)){
         const btn = document.getElementById('pdBuyBtn');
         if (!paymentSettings.sepay_enabled){
             btn.disabled = true;
