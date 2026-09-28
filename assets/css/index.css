@@ -1262,38 +1262,45 @@
 .announce-popup-hide-btn:hover{ color:var(--ink); background:var(--bg); }
 
 /* ---- Thông báo tri ân (farewell) ---- */
-.announce-popup-modal.bye-modal{ max-width:460px; padding:0; overflow-y:auto; overflow-x:hidden; text-align:left; }
+.announce-popup-modal.bye-modal{
+    display:flex; flex-direction:column; padding:0; overflow:hidden; text-align:left;
+    max-width:440px; max-height:calc(100dvh - 40px); border-radius:20px;
+    background:var(--card); border:1px solid var(--line);
+}
 .announce-popup-modal.bye-modal::before{ display:none; }
-.bye-head{
-    position:relative; padding:34px 26px 26px; text-align:center; color:#fff;
-    background:radial-gradient(120% 140% at 15% 0%, #ff8fab 0%, transparent 55%),
-               linear-gradient(135deg, var(--brand) 0%, #8b7cf6 100%);
-}
+.bye-top{ display:flex; align-items:center; gap:12px; padding:18px 18px 14px 20px; flex:0 0 auto; border-bottom:1px solid var(--line); }
 .bye-heart{
-    width:64px; height:64px; margin:0 auto 12px; border-radius:50%;
-    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.4);
-    display:flex; align-items:center; justify-content:center; font-size:1.6rem;
-    backdrop-filter:blur(4px); animation:byeBeat 1.6s ease-in-out .35s 2;
+    flex:0 0 42px; width:42px; height:42px; border-radius:12px; font-size:1.05rem;
+    display:flex; align-items:center; justify-content:center; color:#e5484d;
+    background:color-mix(in srgb, #e5484d 14%, var(--card));
 }
-@keyframes byeBeat{ 0%,100%{ transform:scale(1); } 20%{ transform:scale(1.14); } 40%{ transform:scale(1); } 60%{ transform:scale(1.1); } }
-.bye-date{ font-weight:700; font-size:.85rem; letter-spacing:.3px; opacity:.95; }
-.bye-modal .announce-popup-close{ z-index:2; background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.4); color:#fff; }
-.bye-body{ padding:22px 26px 6px; }
-.bye-title{ font-size:1.3rem; line-height:1.3; margin-bottom:14px; }
-.bye-body p{ color:var(--ink-soft); font-size:.92rem; line-height:1.7; margin:0 0 12px; }
-.bye-body b{ color:var(--ink); }
+.bye-top-text{ flex:1; min-width:0; }
+.bye-title{ font-size:1.05rem; line-height:1.3; margin:0; }
+.bye-date{ font-size:.78rem; color:var(--ink-mute); margin-top:2px; font-weight:600; }
+.bye-modal .announce-popup-close{ position:static; flex:0 0 32px; }
+.bye-body{
+    flex:1 1 auto; min-height:0; overflow-y:auto; padding:16px 20px 6px;
+    scrollbar-width:thin; scrollbar-color:var(--line) transparent;
+}
+.bye-body::-webkit-scrollbar{ width:6px; }
+.bye-body::-webkit-scrollbar-thumb{ background:var(--line); border-radius:6px; }
+.bye-body p{ color:var(--ink-soft); font-size:.88rem; line-height:1.65; margin:0 0 10px; }
+.bye-body b{ color:var(--ink); font-weight:700; }
 .bye-note{
-    display:flex; gap:12px; align-items:flex-start; margin:16px 0; padding:14px 16px;
-    background:var(--green-bg); border-radius:14px; border-left:4px solid var(--green);
-    color:var(--ink-soft); font-size:.9rem; line-height:1.65;
+    display:flex; gap:10px; align-items:flex-start; margin:4px 0 12px; padding:12px 14px;
+    background:color-mix(in srgb, var(--brand) 10%, var(--card)); border-radius:12px;
+    color:var(--ink-soft); font-size:.86rem; line-height:1.6;
 }
-.bye-note > i{ color:var(--green); font-size:1.15rem; margin-top:3px; }
-.bye-sign{ font-weight:800; color:var(--brand); font-size:1.02rem; margin:4px 0 6px; }
-.bye-actions{ padding:14px 26px 24px; }
+.bye-note > i{ color:var(--brand); margin-top:3px; }
+.bye-body .bye-sign{ color:var(--ink); font-weight:700; margin-bottom:8px; }
+.bye-actions{
+    flex:0 0 auto; display:flex; gap:10px; padding:12px 20px 18px; border-top:1px solid var(--line); background:var(--card);
+}
+.bye-actions button{ flex:1; padding:11px 14px; border-radius:12px; font-size:.86rem; }
+.bye-actions .announce-popup-close-btn{ order:0; flex:1.4; box-shadow:none; }
 @media (max-width:480px){
-    .bye-head{ padding:28px 20px 22px; } .bye-body{ padding:18px 20px 4px; } .bye-actions{ padding:12px 20px 20px; }
+    .bye-top{ padding:14px 14px 12px 16px; } .bye-body{ padding:14px 16px 4px; } .bye-actions{ padding:10px 16px 14px; }
 }
-@media (prefers-reduced-motion:reduce){ .bye-heart{ animation:none; } }
 
 /* ============ MODAL: Nâng cấp Pro (chọn gói kiểu thẻ + danh sách tính năng) ============ */
 .pro-upg-overlay{
