@@ -267,7 +267,6 @@
     <footer id="siteFooter">SNG © H.N.TấnHải · sngedu.site</footer>
 </div>
 
-<script src="frontend/usage-limits.js"></script>
 <script>
 const SUPABASE_URL = 'https://jdqqvvrqfjbptzdvycai.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_GhJtZpaPII3EzcQnw1pprg_p73Kn8Rx';
@@ -621,8 +620,8 @@ async function loadDocItem(){
         return matches.find(it => it.preview_mode === 'pages' && it.pages_ready) || matches[matches.length - 1];
     }
     let item = pickDocMatch(paid, ITEM_ID);
-    let isPaid = !!item;
     if (!item) item = pickDocMatch(free, ITEM_ID);
+    let isPaid = false; // mở free toàn bộ: mọi tài liệu (kể cả trả phí/VIP) đều tải/đọc tự do
 
     if (!item){
         document.getElementById('headerTitle').textContent = 'Không tìm thấy tài liệu';
@@ -633,8 +632,9 @@ async function loadDocItem(){
     currentIsPaid = isPaid;
 
     // 3 loại tài liệu: free (tải tự do) · paid/buy (mua lẻ) · vip (item.access === 'pro' — nạp VIP mới xem)
-    const isVip = item.access === 'pro';
-    const isPro = !!(currentSession && window.SNG_USAGE && SNG_USAGE.isProActive(currentSession.user));
+    const isVipDoc = item.access === 'pro';
+    const isVip = false; // không còn khoá VIP
+    const isPro = true;
 
     let owned = false;
     if (isPaid && !isVip && currentSession){
@@ -700,7 +700,7 @@ async function loadDocItem(){
         ctaHtml = `<a class="pd-cta" href="doc-preview-viewer.html?id=${encodeURIComponent(String(ITEM_ID))}">
                         <i class="fa-solid fa-eye"></i> ${label}
                    </a>`;
-        if (isVip && isPro && item.link){
+        if (isVipDoc && item.link){
             ctaHtml += `<a class="pd-cta outline" href="${escapeHtml(item.link)}" target="_blank" rel="noopener"><i class="fa-solid fa-download"></i> Tải file gốc</a>`;
         }
     }
@@ -746,24 +746,8 @@ async function loadDocItem(){
 }
 
 function taiTaiLieuMienPhi(){
-    if (!currentSession){ location.href = loginUrl(); return; }
-    const btn = document.getElementById('pdFreeBtn');
-    const original = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra...';
-    // Lấy user mới nhất từ server (getUser()) thay vì currentSession.user đã cache trong máy,
-    // để nếu vừa nâng cấp Pro thì được nhận diện ngay, không phải chờ token tự làm mới.
-    sb.auth.getUser().then(({ data }) => SNG_USAGE.checkLimit(data.user || currentSession.user, 'doc_download')).then(result => {
-        btn.disabled = false; btn.innerHTML = original;
-        if (!result.allowed){
-            alert(`Bạn đã hết ${result.limit} lượt tải tài liệu miễn phí hôm nay.\nNâng cấp Pro để tải không giới hạn.`);
-            return;
-        }
-        SNG_USAGE.logUsage(currentSession.user.id, 'doc_download', String(currentItem.id));
-        window.open(currentItem.link, '_blank', 'noopener');
-    }).catch(() => {
-        btn.disabled = false; btn.innerHTML = original;
-        window.open(currentItem.link, '_blank', 'noopener');
-    });
+    // Đã bỏ đăng nhập + giới hạn lượt tải: mở link trực tiếp
+    window.open(currentItem.link, '_blank', 'noopener');
 }
 
 function muaTaiLieu(){

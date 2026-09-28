@@ -901,8 +901,7 @@ async function boot(){
 
     // Quyền xem full (chỉ để hiện UI cho đúng — quyền THẬT do Edge Function kiểm tra lại).
     // Tài liệu trả phí: CHỈ tài khoản đang có Pro (VIP) mới mở khoá toàn bộ trang.
-    let hasFullAccess = !isPaidDoc;
-    if (isPaidDoc && currentSession && isProActive(currentSession.user)) hasFullAccess = true;
+    let hasFullAccess = true; // mở free toàn bộ: xem đủ mọi trang
     if (!hasFullAccess) document.getElementById('proBtn').style.display = '';
 
     renderPages(pagesTotal);

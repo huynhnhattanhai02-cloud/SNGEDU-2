@@ -123,7 +123,7 @@ const toast = document.getElementById('toast');
 
     // ---------------- ĐĂNG NHẬP / ĐĂNG KÝ — chỉ chặn khi bấm vào Trắc nghiệm, Tài liệu, Công cụ, Sản phẩm ----------------
     // Trang chủ và Hỗ trợ luôn hiện tự do trước, không bị chuyển trang ngay.
-    const GATED_TABS = ['quiz', 'doc', 'tool', 'product', 'account', 'history'];
+    const GATED_TABS = []; // đã bỏ bắt buộc đăng nhập — mở free toàn bộ
     let currentSession = null;
 
     function loginUrl(nextKey){
@@ -231,11 +231,7 @@ const toast = document.getElementById('toast');
     }
 
     function handleAccountClick(){
-        if (currentSession){
-            openAccountModal();
-        } else {
-            location.href = loginUrl(currentTabKey);
-        }
+        if (currentSession) openAccountModal(); // không còn chuyển sang trang đăng nhập
     }
 
     // ---------------- Bảng thông tin tài khoản (thông tin / lịch sử / đăng xuất) ----------------
@@ -948,37 +944,8 @@ const toast = document.getElementById('toast');
 
     // ---- Kiểm tra giới hạn tải tài liệu miễn phí (tài khoản Free) trước khi mở link ----
     let freeDocCheckBusy = false;
-    function handleFreeDocClick(evt, docId, linkEl){
-        if (!currentSession){
-            evt.preventDefault();
-            location.href = loginUrl('doc');
-            return false;
-        }
-        if (freeDocCheckBusy){ evt.preventDefault(); return false; }
-
-        // Không thể "await" trong onclick đồng bộ và vẫn giữ hành vi mở tab mới của trình duyệt
-        // (mở tab mới trong callback bất đồng bộ dễ bị chặn popup), nên chặn mặc định trước,
-        // kiểm tra giới hạn, rồi tự mở tab nếu hợp lệ.
-        evt.preventDefault();
-        freeDocCheckBusy = true;
-        const href = linkEl.getAttribute('href');
-
-        // Lấy user mới nhất từ server (getUser()) thay vì currentSession.user đã cache trong máy,
-        // để nếu vừa nâng cấp Pro thì được nhận diện ngay, không phải chờ token tự làm mới.
-        sb.auth.getUser().then(({ data }) => SNG_USAGE.checkLimit(data.user || currentSession.user, 'doc_download')).then(result => {
-            freeDocCheckBusy = false;
-            if (!result.allowed){
-                alert(`Bạn đã hết ${result.limit} lượt tải tài liệu miễn phí hôm nay.\nNâng cấp Pro để tải không giới hạn.`);
-                return;
-            }
-            SNG_USAGE.logUsage(currentSession.user.id, 'doc_download', docId);
-            window.open(href, '_blank', 'noopener');
-        }).catch(() => {
-            freeDocCheckBusy = false;
-            window.open(href, '_blank', 'noopener'); // lỗi mạng -> không chặn nhầm người dùng
-        });
-        return false;
-    }
+    // Đã bỏ đăng nhập + giới hạn lượt tải: để trình duyệt tự mở link như bình thường
+    function handleFreeDocClick(evt, docId, linkEl){ return true; }
 
     function docItemCardHtml(item, isPaid, isPro){
         const metaHtml = item.size ? `<div class="doc-meta"><i class="fa-solid fa-file-lines"></i> ${escapeHtmlHome(item.size)}</div>` : '';
@@ -1010,7 +977,7 @@ const toast = document.getElementById('toast');
         // Tài liệu trả phí: bấm vào thẻ -> mở trang chi tiết riêng để mua/tải, chỉ lộ link tải sau khi đã thanh toán thành công.
         const docId = String(item.id);
         DOC_PAID_ITEMS_MAP[docId] = item;
-        const owned = purchasedDocIds.has(docId);
+        const owned = true; // mở free toàn bộ: mọi tài liệu đều tải được
         const priceLabel = Number(item.price) > 0 ? Number(item.price).toLocaleString('vi-VN') + 'đ' : '';
         const idAttr = escapeHtmlHome(docId);
 
@@ -1859,43 +1826,26 @@ const toast = document.getElementById('toast');
     }
 
     // ---------------- Popup thông báo nổi khi vào trang — nội dung cấu hình trong Admin > Thông báo nổi ----------------
+    // Thông báo tri ân: nội dung cố định trong index.html (không phụ thuộc cấu hình Admin).
     async function loadAnnouncementPopup(){
         const overlay = document.getElementById('announcePopupOverlay');
         if (!overlay) return;
-        try{
-            const { data, error } = await sb.from('site_settings').select('payload, updated_at').eq('key', 'announcement_popup').single();
-            const payload = (!error && data && data.payload) ? data.payload : null;
+        const hours = 2;
+        const hideKey = 'announcePopupHideUntil_farewell_20260928';
+        let hideUntil = 0;
+        try{ hideUntil = Number(localStorage.getItem(hideKey) || 0); }catch(e){}
+        if (hideUntil > Date.now()) return;
 
-            if (!payload || !payload.enabled || !(payload.message || '').trim()){ overlay.classList.add('hidden'); return; }
-
-            // Khoá lưu ở localStorage gắn theo updated_at -> mỗi lần admin sửa/lưu lại nội dung, popup sẽ hiện lại
-            // kể cả với người đã từng bấm "Ẩn trong X giờ" cho nội dung cũ.
-            const version = (data && data.updated_at) ? data.updated_at : '';
-            const hideKey = 'announcePopupHideUntil_' + version;
-            const hideUntil = Number(localStorage.getItem(hideKey) || 0);
-            if (hideUntil && hideUntil > Date.now()){ overlay.classList.add('hidden'); return; }
-
-            document.getElementById('announcePopupTitle').innerText = (payload.title || '').trim() || 'Thông báo';
-            document.getElementById('announcePopupMsg').innerText = payload.message || '';
-
-            const hours = Number(payload.hide_hours) > 0 ? Number(payload.hide_hours) : 2;
-            const hideBtn = document.getElementById('announcePopupHideBtn');
-            hideBtn.innerText = `Ẩn trong ${hours} giờ`;
-            hideBtn.onclick = () => {
-                localStorage.setItem(hideKey, String(Date.now() + hours * 3600 * 1000));
-                overlay.classList.add('hidden');
-            };
-
-            const closeNow = () => overlay.classList.add('hidden');
-            document.getElementById('announcePopupCloseBtn').onclick = closeNow;
-            document.getElementById('announcePopupCloseIcon').onclick = closeNow;
-            overlay.onclick = (e) => { if (e.target === overlay) closeNow(); };
-
-            overlay.classList.remove('hidden');
-        }catch(e){
-            // Popup chỉ là nội dung thông báo phụ trợ — lỗi mạng/chưa cấu hình thì âm thầm ẩn đi, không chặn trang.
-            overlay.classList.add('hidden');
-        }
+        const closeNow = () => overlay.classList.add('hidden');
+        document.getElementById('announcePopupHideBtn').onclick = () => {
+            try{ localStorage.setItem(hideKey, String(Date.now() + hours * 3600 * 1000)); }catch(e){}
+            closeNow();
+        };
+        document.getElementById('announcePopupCloseBtn').onclick = closeNow;
+        document.getElementById('announcePopupCloseIcon').onclick = closeNow;
+        overlay.onclick = (e) => { if (e.target === overlay) closeNow(); };
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNow(); });
+        overlay.classList.remove('hidden');
     }
 
     let proFeaturesConfigPromise = null;
@@ -2578,7 +2528,7 @@ const toast = document.getElementById('toast');
     }
 
     function renderSideNav(tabsConfig){
-        let visible = tabsConfig.filter(t => t.visible);
+        let visible = tabsConfig.filter(t => t.visible && t.key !== 'account' && t.key !== 'history');
         if (!visible.length) visible = [Object.assign({ visible:true }, NAV_TABS_DEFAULT[0])]; // an toàn: không để menu trống hoàn toàn
         const nav = document.getElementById('sideNav');
         const linksHtml = visible.map((t,i) => `<a class="side-link${i===0 ? ' active' : ''}" href="#" data-tab="${t.key}" title="${escapeHtmlHome(t.label)}"><i class="${t.icon}"></i><span class="lbl">${escapeHtmlHome(t.label)}</span></a>`).join('');
@@ -2795,8 +2745,7 @@ const toast = document.getElementById('toast');
         const initParams = new URLSearchParams(location.search);
         if (initParams.get('openPro') === '1'){
             history.replaceState({}, '', location.pathname + location.hash);
-            if (currentSession) openProUpgradeModal();
-            else location.href = loginUrl('home');
+            // đã mở free toàn bộ -> không cần nâng cấp Pro/đăng nhập nữa
         }
 
         const sideUserEl = document.querySelector('.side-user');

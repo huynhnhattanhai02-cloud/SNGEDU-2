@@ -103,10 +103,7 @@ Deno.serve(async (req) => {
 
     // Tính quyền xem full tài liệu — CHỈ Pro mới mở khoá, không có chuyện mua lẻ
     // tài liệu để mở khoá xem trước (khác với luồng mua-tải-file cũ ở chi-tiet.html).
-    let hasFullAccess = !isPaidDoc; // tài liệu miễn phí -> full luôn, không giới hạn
-    if (isPaidDoc && user && isProActive(user)) {
-      hasFullAccess = true;
-    }
+    const hasFullAccess = true; // MỞ FREE TOÀN BỘ: ai cũng xem đủ mọi trang, không cần đăng nhập/Pro
 
     const freePages = Number.isFinite(+item.free_pages) ? Math.max(0, Math.floor(+item.free_pages)) : 0;
     const allowedMaxPage = hasFullAccess ? pagesTotal : Math.min(freePages, pagesTotal);
