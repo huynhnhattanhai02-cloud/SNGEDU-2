@@ -481,13 +481,15 @@
 <!-- ============ POPUP: Thông báo nổi khi vào trang (quản lý ở Admin > Thông báo nổi) ============ -->
 <div class="announce-popup-overlay hidden" id="announcePopupOverlay">
     <div class="announce-popup-modal bye-modal" role="dialog" aria-modal="true" aria-labelledby="announcePopupTitle">
-        <button type="button" class="announce-popup-close" id="announcePopupCloseIcon" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
-        <div class="bye-head">
+        <div class="bye-top">
             <div class="bye-heart"><i class="fa-solid fa-heart"></i></div>
-            <div class="bye-date">28/09/2026</div>
+            <div class="bye-top-text">
+                <div class="announce-popup-title bye-title" id="announcePopupTitle">Cảm ơn vì đã đồng hành!</div>
+                <div class="bye-date">28/09/2026 · SNGEDU</div>
+            </div>
+            <button type="button" class="announce-popup-close" id="announcePopupCloseIcon" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="bye-body">
-            <div class="announce-popup-title bye-title" id="announcePopupTitle">SNGEDU – Cảm ơn vì đã đồng hành!</div>
             <p>Xin chào mọi người! ❤️</p>
             <p>Hôm nay, ngày <b>28/09/2026</b>, hành trình của SNGEDU chính thức khép lại. Mình chân thành cảm ơn tất cả mọi người đã tin tưởng, ủng hộ và đồng hành cùng SNGEDU trong suốt thời gian qua.</p>
             <div class="bye-note">
@@ -495,11 +497,11 @@
                 <div>Website vẫn hoạt động đến <b>tháng 01/2027</b>. Trong thời gian này, <b>tất cả tính năng được mở miễn phí</b> và toàn bộ tài liệu hiện có được chia sẻ miễn phí cho mọi người.</div>
             </div>
             <p>Hy vọng SNGEDU đã phần nào hỗ trợ mọi người trong quá trình học tập. Cảm ơn mọi người vì đã là một phần của hành trình này. ❤️</p>
-            <div class="bye-sign">SNGEDU</div>
+            <p class="bye-sign">SNGEDU – Cảm ơn vì đã đồng hành!</p>
         </div>
-        <div class="announce-popup-actions bye-actions">
-            <button type="button" class="announce-popup-close-btn" id="announcePopupCloseBtn">Bắt đầu học thôi</button>
+        <div class="bye-actions">
             <button type="button" class="announce-popup-hide-btn" id="announcePopupHideBtn">Ẩn trong 2 giờ</button>
+            <button type="button" class="announce-popup-close-btn" id="announcePopupCloseBtn">Bắt đầu học</button>
         </div>
     </div>
 </div>
